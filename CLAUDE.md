@@ -95,6 +95,159 @@ The entire application lives in a single `server.js` file. There are no separate
 3. **Use Token**: Include in Authorization header: `Authorization: Bearer <token>`
 4. **Access Protected Routes**: All other endpoints require this header
 
+## Using the Deployed Application
+
+### Web UI Access (Render)
+The application is deployed at: **https://sales-coach-api-xtzh.onrender.com**
+
+#### Accessing the Web Interface
+1. Open https://sales-coach-api-xtzh.onrender.com in your browser
+2. You'll see a login page
+3. Enter credentials:
+   - Username: `admin`
+   - Password: `password123`
+4. After login, you can:
+   - View all products in a table
+   - Search products by any field
+   - Filter by category
+   - Add new products
+   - Edit existing products
+   - Delete products
+
+### API Access via curl
+
+#### Step 1: Get Authentication Token
+```bash
+curl -X POST https://sales-coach-api-xtzh.onrender.com/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "password123"}'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expiresIn": "24h"
+}
+```
+
+Save the `token` value for use in subsequent requests.
+
+#### Step 2: Use Token in API Requests
+
+**Get All Items:**
+```bash
+curl https://sales-coach-api-xtzh.onrender.com/api/items \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+```
+
+**Search for Products:**
+```bash
+# Search for "BUTTERMILK BISCUIT MIX"
+curl "https://sales-coach-api-xtzh.onrender.com/api/items/search?q=BUTTERMILK%20BISCUIT%20MIX" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+
+# Search for any text (e.g., "chocolate")
+curl "https://sales-coach-api-xtzh.onrender.com/api/items/search?q=chocolate" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+```
+
+**Get Product by ID:**
+```bash
+curl https://sales-coach-api-xtzh.onrender.com/api/items/0 \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+```
+
+**Get Product by SKU:**
+```bash
+curl https://sales-coach-api-xtzh.onrender.com/api/items/sku/10050 \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+```
+
+**Get All Categories:**
+```bash
+curl https://sales-coach-api-xtzh.onrender.com/api/categories \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+```
+
+**Filter by Category:**
+```bash
+curl "https://sales-coach-api-xtzh.onrender.com/api/items/category/Cat%206%20Mix%20Cookie-Biscuit-Pancake-Churro" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+```
+
+**Create New Product:**
+```bash
+curl -X POST https://sales-coach-api-xtzh.onrender.com/api/items \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -d '{
+    "SKU": "12345",
+    "PACK": "BAG",
+    "SIZE": "50#",
+    "BRAND": "WESTCO",
+    "ITEM": "NEW PRODUCT",
+    "CATEGORY": "Cat 5 Mix Brownie",
+    "PRICE": "199"
+  }'
+```
+
+**Update Product:**
+```bash
+curl -X PUT https://sales-coach-api-xtzh.onrender.com/api/items/1 \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -d '{"PRICE": "250"}'
+```
+
+**Delete Product:**
+```bash
+curl -X DELETE https://sales-coach-api-xtzh.onrender.com/api/items/1 \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+```
+
+### Automated Token Management (Bash Script)
+
+For convenience, you can automatically get the token and use it:
+
+```bash
+# Get token and store in variable
+TOKEN=$(curl -s -X POST https://sales-coach-api-xtzh.onrender.com/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "password123"}' \
+  | grep -o '"token":"[^"]*' | grep -o '[^"]*$')
+
+# Use the token
+curl https://sales-coach-api-xtzh.onrender.com/api/items \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Integration with Chatbot
+
+For chatbot integration:
+1. **Authenticate**: Call `/api/login` to get a token (store it for 24 hours)
+2. **Query Products**: Use `/api/items/search?q=QUERY` to find products
+3. **Get Details**: Use `/api/items/:id` or `/api/items/sku/:sku` for specific items
+4. **Real-time Sync**: Any changes made in the web UI are immediately reflected in API responses
+
+### Example Product Data
+
+Example item returned from API (BUTTERMILK BISCUIT MIX):
+```json
+{
+  "id": 0,
+  "SKU": "10050",
+  "PACK": "BAG",
+  "SIZE": "50#",
+  "BRAND": "WESTCO",
+  "ITEM": "BUTTERMILK BISCUIT MIX",
+  "CATEGORY": "Cat 6 Mix Cookie-Biscuit-Pancake-Churro",
+  "PRICE": "212"
+}
+```
+
 ## Product Categories
 
 The 8 product categories are:
