@@ -1,11 +1,42 @@
 const express = require('express');
 const cors = require('cors');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const app = express();
+
+// Configuration
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
+const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || '$2b$10$rKqwBxZlLZJlGQ0p3mXDQOxCZqJxVZ5xHKQ5fKYZQqYZqYZqYZqYZ'; // Default: 'password123'
 
 // Middleware
 app.use(cors()); // Enable CORS for all origins
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Authentication middleware
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      error: 'Access token required. Please login first.'
+    });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({
+        success: false,
+        error: 'Invalid or expired token'
+      });
+    }
+    req.user = user;
+    next();
+  });
+};
 
 // Initial data (your sales coach items)
 let items = [
@@ -215,22 +246,66 @@ app.get('/', (req, res) => {
   res.json({
     message: 'Sales Coach API',
     version: '1.0.0',
+    authentication: 'Required - Use POST /api/login to get access token',
     endpoints: {
-      items: '/api/items - Get all items',
-      itemBySku: '/api/items/sku/:sku - Get item by SKU',
-      itemById: '/api/items/:id - Get item by ID',
-      categories: '/api/categories - Get all categories',
-      itemsByCategory: '/api/items/category/:category - Get items by category',
-      search: '/api/items/search?q=query - Search items',
-      create: 'POST /api/items - Create new item',
-      update: 'PUT /api/items/:id - Update item',
-      delete: 'DELETE /api/items/:id - Delete item'
+      login: 'POST /api/login - Get access token (username, password)',
+      items: 'GET /api/items - Get all items (requires auth)',
+      itemBySku: 'GET /api/items/sku/:sku - Get item by SKU (requires auth)',
+      itemById: 'GET /api/items/:id - Get item by ID (requires auth)',
+      categories: 'GET /api/categories - Get all categories (requires auth)',
+      itemsByCategory: 'GET /api/items/category/:category - Get items by category (requires auth)',
+      search: 'GET /api/items/search?q=query - Search items (requires auth)',
+      create: 'POST /api/items - Create new item (requires auth)',
+      update: 'PUT /api/items/:id - Update item (requires auth)',
+      delete: 'DELETE /api/items/:id - Delete item (requires auth)'
     }
   });
 });
 
+// Login endpoint
+app.post('/api/login', async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({
+      success: false,
+      error: 'Username and password are required'
+    });
+  }
+
+  // Validate credentials
+  if (username !== ADMIN_USERNAME) {
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid credentials'
+    });
+  }
+
+  const passwordMatch = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
+  if (!passwordMatch) {
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid credentials'
+    });
+  }
+
+  // Generate JWT token
+  const token = jwt.sign(
+    { username: username },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+  );
+
+  res.json({
+    success: true,
+    message: 'Login successful',
+    token: token,
+    expiresIn: '24h'
+  });
+});
+
 // GET all items
-app.get('/api/items', (req, res) => {
+app.get('/api/items', authenticateToken, (req, res) => {
   res.json({
     success: true,
     count: items.length,
@@ -239,7 +314,7 @@ app.get('/api/items', (req, res) => {
 });
 
 // GET all unique categories
-app.get('/api/categories', (req, res) => {
+app.get('/api/categories', authenticateToken, (req, res) => {
   const categories = [...new Set(items.map(item => item.CATEGORY))].sort();
   res.json({
     success: true,
@@ -249,7 +324,7 @@ app.get('/api/categories', (req, res) => {
 });
 
 // GET item by ID
-app.get('/api/items/:id', (req, res) => {
+app.get('/api/items/:id', authenticateToken, (req, res) => {
   const item = items.find(i => i.id === parseInt(req.params.id));
   if (item) {
     res.json({
@@ -265,7 +340,7 @@ app.get('/api/items/:id', (req, res) => {
 });
 
 // GET item by SKU
-app.get('/api/items/sku/:sku', (req, res) => {
+app.get('/api/items/sku/:sku', authenticateToken, (req, res) => {
   const item = items.find(i => i.SKU === req.params.sku);
   if (item) {
     res.json({
@@ -281,7 +356,7 @@ app.get('/api/items/sku/:sku', (req, res) => {
 });
 
 // GET items by category
-app.get('/api/items/category/:category', (req, res) => {
+app.get('/api/items/category/:category', authenticateToken, (req, res) => {
   const categoryItems = items.filter(i => 
     i.CATEGORY.toLowerCase() === decodeURIComponent(req.params.category).toLowerCase()
   );
@@ -293,7 +368,7 @@ app.get('/api/items/category/:category', (req, res) => {
 });
 
 // GET search items
-app.get('/api/items/search', (req, res) => {
+app.get('/api/items/search', authenticateToken, (req, res) => {
   const query = req.query.q;
   if (!query) {
     return res.status(400).json({
@@ -317,7 +392,7 @@ app.get('/api/items/search', (req, res) => {
 });
 
 // POST create new item
-app.post('/api/items', (req, res) => {
+app.post('/api/items', authenticateToken, (req, res) => {
   const { SKU, PACK, SIZE, BRAND, ITEM, CATEGORY, PRICE } = req.body;
 
   // Validation
@@ -349,7 +424,7 @@ app.post('/api/items', (req, res) => {
 });
 
 // PUT update item
-app.put('/api/items/:id', (req, res) => {
+app.put('/api/items/:id', authenticateToken, (req, res) => {
   const index = items.findIndex(i => i.id === parseInt(req.params.id));
   
   if (index === -1) {
@@ -380,7 +455,7 @@ app.put('/api/items/:id', (req, res) => {
 });
 
 // DELETE item
-app.delete('/api/items/:id', (req, res) => {
+app.delete('/api/items/:id', authenticateToken, (req, res) => {
   const index = items.findIndex(i => i.id === parseInt(req.params.id));
   
   if (index === -1) {
