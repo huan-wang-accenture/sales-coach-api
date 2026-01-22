@@ -224,17 +224,70 @@ curl -X POST https://sales-coach-api-xtzh.onrender.com/api/items/filter \
 ```
 
 **Filter Endpoint Details:**
-- **Method**: POST (accepts parameters in request body)
+- **Method**: POST (accepts parameters in request body - read-only, does NOT modify data)
 - **All parameters are optional** - omit any you don't need
 - **Case-insensitive contains matching** - searches for partial matches
-- **Parameters**:
-  - `item`: Search in Item name (e.g., "MIX" finds "BUTTERMILK BISCUIT MIX")
-  - `brand`: Filter by Brand (e.g., "west" finds "WESTCO")
-  - `category`: Filter by Category (e.g., "Cat 6" finds "Cat 6 Mix Cookie-Biscuit-Pancake-Churro")
-  - `minPrice`: Minimum price threshold (number)
-  - `maxPrice`: Maximum price threshold (number)
+- **Combine any parameters** - all filters work together simultaneously
 
-**Example: Search for "BISCUIT" from "WESTCO" brand with price ≥ $200:**
+**Complete Parameter Reference:**
+
+| Parameter | Type | Description | Matching | Example Values |
+|-----------|------|-------------|----------|----------------|
+| `item` | string | Search in Item name | Case-insensitive contains | `"MIX"`, `"CHOCOLATE"`, `"BISCUIT"` |
+| `brand` | string | Filter by Brand | Case-insensitive contains | `"WESTCO"`, `"NESTLE"`, `"CARAVA"` |
+| `category` | string | Filter by Category | Case-insensitive contains | `"Cat 6"`, `"Brownie"`, `"Chocolate"` |
+| `minPrice` | number | Minimum price (≥) | Greater than or equal | `50`, `100`, `200` |
+| `maxPrice` | number | Maximum price (≤) | Less than or equal | `300`, `500`, `1000` |
+
+**Examples:**
+- `item: "MIX"` finds "BUTTERMILK BISCUIT MIX", "CAKE MIX", "BROWNIE MIX"
+- `brand: "west"` finds "WESTCO" (partial match, case-insensitive)
+- `category: "Cat 6"` finds "Cat 6 Mix Cookie-Biscuit-Pancake-Churro"
+- `minPrice: 100, maxPrice: 300` finds items priced between $100-$300
+
+### Filter Endpoint Usage Examples
+
+**Example 1: Search by Item Name**
+```bash
+curl -X POST https://sales-coach-api-xtzh.onrender.com/api/items/filter \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -d '{"item": "CHOCOLATE"}'
+```
+
+**Example 2: Filter by Brand**
+```bash
+curl -X POST https://sales-coach-api-xtzh.onrender.com/api/items/filter \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -d '{"brand": "WESTCO"}'
+```
+
+**Example 3: Price Range - Items between $100 and $300**
+```bash
+curl -X POST https://sales-coach-api-xtzh.onrender.com/api/items/filter \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -d '{"minPrice": 100, "maxPrice": 300}'
+```
+
+**Example 4: Price Range - Items under $50**
+```bash
+curl -X POST https://sales-coach-api-xtzh.onrender.com/api/items/filter \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -d '{"maxPrice": 50}'
+```
+
+**Example 5: Price Range - Items over $200**
+```bash
+curl -X POST https://sales-coach-api-xtzh.onrender.com/api/items/filter \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -d '{"minPrice": 200}'
+```
+
+**Example 6: Combined Filters - "BISCUIT" from "WESTCO" priced ≥ $200**
 ```bash
 curl -X POST https://sales-coach-api-xtzh.onrender.com/api/items/filter \
   -H "Content-Type: application/json" \
@@ -242,7 +295,21 @@ curl -X POST https://sales-coach-api-xtzh.onrender.com/api/items/filter \
   -d '{"item": "BISCUIT", "brand": "WESTCO", "minPrice": 200}'
 ```
 
-**Response:**
+**Example 7: All Filters Combined**
+```bash
+curl -X POST https://sales-coach-api-xtzh.onrender.com/api/items/filter \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -d '{
+    "item": "CHOCOLATE",
+    "brand": "NESTLE",
+    "category": "Cat 50",
+    "minPrice": 50,
+    "maxPrice": 200
+  }'
+```
+
+**Response Format:**
 ```json
 {
   "success": true,
