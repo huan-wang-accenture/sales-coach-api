@@ -62,12 +62,28 @@
                 <button id="addProductBtn" class="btn btn-success">+ Add Product</button>
             </div>
 
-            <!-- Category Filter -->
-            <div class="filter-container">
-                <label for="categoryFilter">Filter by Category:</label>
-                <select id="categoryFilter">
-                    <option value="">All Categories</option>
-                </select>
+            <!-- Filters -->
+            <div class="filters-grid">
+                <div class="filter-group">
+                    <label for="categoryFilter">Category:</label>
+                    <select id="categoryFilter">
+                        <option value="">All Categories</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="brandFilter">Brand:</label>
+                    <select id="brandFilter">
+                        <option value="">All Brands</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="minPrice">Min Price:</label>
+                    <input type="number" id="minPrice" placeholder="$0" min="0" step="1">
+                </div>
+                <div class="filter-group">
+                    <label for="maxPrice">Max Price:</label>
+                    <input type="number" id="maxPrice" placeholder="$999" min="0" step="1">
+                </div>
             </div>
 
             <!-- Products Table -->

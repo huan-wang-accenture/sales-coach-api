@@ -228,28 +228,41 @@ body {
     font-size: 14px;
 }
 
-.filter-container {
+.filters-grid {
     background: white;
     padding: 20px;
     border-radius: 10px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 15px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
 }
 
-.filter-container label {
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.filter-group label {
     font-weight: 600;
     color: #333;
+    font-size: 14px;
 }
 
-.filter-container select {
+.filter-group select,
+.filter-group input[type="number"] {
     padding: 10px;
     border: 1px solid #ddd;
     border-radius: 5px;
     font-size: 14px;
-    min-width: 250px;
+}
+
+.filter-group select:focus,
+.filter-group input[type="number"]:focus {
+    outline: none;
+    border-color: #667eea;
 }
 
 /* Table */

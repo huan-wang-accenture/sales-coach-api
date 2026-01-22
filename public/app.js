@@ -21,6 +21,9 @@ const searchInput = document.getElementById('searchInput');
 const searchBtn = document.getElementById('searchBtn');
 const clearSearchBtn = document.getElementById('clearSearchBtn');
 const categoryFilter = document.getElementById('categoryFilter');
+const brandFilter = document.getElementById('brandFilter');
+const minPriceInput = document.getElementById('minPrice');
+const maxPriceInput = document.getElementById('maxPrice');
 const addProductBtn = document.getElementById('addProductBtn');
 const productModal = document.getElementById('productModal');
 const productForm = document.getElementById('productForm');
@@ -41,12 +44,15 @@ if (token) {
 // Event Listeners
 loginForm.addEventListener('submit', handleLogin);
 logoutBtn.addEventListener('click', handleLogout);
-searchBtn.addEventListener('click', handleSearch);
+searchBtn.addEventListener('click', applyFilters);
 clearSearchBtn.addEventListener('click', handleClearSearch);
 searchInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') handleSearch();
+    if (e.key === 'Enter') applyFilters();
 });
-categoryFilter.addEventListener('change', handleCategoryFilter);
+categoryFilter.addEventListener('change', applyFilters);
+brandFilter.addEventListener('change', applyFilters);
+minPriceInput.addEventListener('input', applyFilters);
+maxPriceInput.addEventListener('input', applyFilters);
 addProductBtn.addEventListener('click', () => openProductModal());
 closeModal.addEventListener('click', closeProductModal);
 cancelBtn.addEventListener('click', closeProductModal);
@@ -149,6 +155,7 @@ async function loadCategories() {
         const data = await apiCall('/api/categories');
         allCategories = data.data;
         populateCategoryDropdowns();
+        populateBrandDropdown();
         totalCategories.textContent = allCategories.length;
     } catch (error) {
         console.error('Error loading categories:', error);
@@ -193,47 +200,69 @@ function populateCategoryDropdowns() {
     document.getElementById('category').innerHTML = '<option value="">Select a category</option>' + options;
 }
 
-// Search and Filter
-async function handleSearch() {
-    const query = searchInput.value.trim();
-    if (!query) {
-        displayProducts(allProducts);
-        return;
+function populateBrandDropdown() {
+    const brands = [...new Set(allProducts.map(p => p.BRAND).filter(b => b))].sort();
+    const options = brands.map(brand =>
+        `<option value="${brand}">${brand}</option>`
+    ).join('');
+
+    brandFilter.innerHTML = '<option value="">All Brands</option>' + options;
+}
+
+// Search and Filter - Combined Client-Side Filtering
+function applyFilters() {
+    const searchQuery = searchInput.value.trim().toLowerCase();
+    const selectedCategory = categoryFilter.value;
+    const selectedBrand = brandFilter.value;
+    const minPrice = minPriceInput.value ? parseFloat(minPriceInput.value) : null;
+    const maxPrice = maxPriceInput.value ? parseFloat(maxPriceInput.value) : null;
+
+    let filtered = allProducts;
+
+    // Filter by search query (search in ITEM field only)
+    if (searchQuery) {
+        filtered = filtered.filter(product =>
+            product.ITEM.toLowerCase().includes(searchQuery)
+        );
     }
 
-    try {
-        showLoading(true);
-        const data = await apiCall(`/api/items/search?q=${encodeURIComponent(query)}`);
-        displayProducts(data.data);
-    } catch (error) {
-        showError(error.message);
-    } finally {
-        showLoading(false);
+    // Filter by category
+    if (selectedCategory) {
+        filtered = filtered.filter(product =>
+            product.CATEGORY === selectedCategory
+        );
     }
+
+    // Filter by brand
+    if (selectedBrand) {
+        filtered = filtered.filter(product =>
+            product.BRAND === selectedBrand
+        );
+    }
+
+    // Filter by price range
+    if (minPrice !== null) {
+        filtered = filtered.filter(product =>
+            parseFloat(product.PRICE) >= minPrice
+        );
+    }
+
+    if (maxPrice !== null) {
+        filtered = filtered.filter(product =>
+            parseFloat(product.PRICE) <= maxPrice
+        );
+    }
+
+    displayProducts(filtered);
 }
 
 function handleClearSearch() {
     searchInput.value = '';
     categoryFilter.value = '';
+    brandFilter.value = '';
+    minPriceInput.value = '';
+    maxPriceInput.value = '';
     displayProducts(allProducts);
-}
-
-async function handleCategoryFilter() {
-    const category = categoryFilter.value;
-    if (!category) {
-        displayProducts(allProducts);
-        return;
-    }
-
-    try {
-        showLoading(true);
-        const data = await apiCall(`/api/items/category/${encodeURIComponent(category)}`);
-        displayProducts(data.data);
-    } catch (error) {
-        showError(error.message);
-    } finally {
-        showLoading(false);
-    }
 }
 
 // Product Modal
