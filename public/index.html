@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Coach - Product Manager</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="screen">
+        <div class="login-container">
+            <h1>Sales Coach API</h1>
+            <p class="subtitle">Product Management System</p>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn btn-primary">Login</button>
+                <div id="loginError" class="error-message"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App Screen -->
+    <div id="appScreen" class="screen hidden">
+        <nav class="navbar">
+            <div class="nav-content">
+                <h1>Sales Coach - Product Manager</h1>
+                <div class="nav-actions">
+                    <span id="userInfo" class="user-info"></span>
+                    <button id="logoutBtn" class="btn btn-secondary">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container">
+            <!-- Stats -->
+            <div class="stats-container">
+                <div class="stat-card">
+                    <h3 id="totalProducts">0</h3>
+                    <p>Total Products</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="totalCategories">0</h3>
+                    <p>Categories</p>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="controls">
+                <div class="search-container">
+                    <input type="text" id="searchInput" placeholder="Search products...">
+                    <button id="searchBtn" class="btn btn-primary">Search</button>
+                    <button id="clearSearchBtn" class="btn btn-secondary">Clear</button>
+                </div>
+                <button id="addProductBtn" class="btn btn-success">+ Add Product</button>
+            </div>
+
+            <!-- Category Filter -->
+            <div class="filter-container">
+                <label for="categoryFilter">Filter by Category:</label>
+                <select id="categoryFilter">
+                    <option value="">All Categories</option>
+                </select>
+            </div>
+
+            <!-- Products Table -->
+            <div class="table-container">
+                <table id="productsTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>SKU</th>
+                            <th>Brand</th>
+                            <th>Item</th>
+                            <th>Category</th>
+                            <th>Pack</th>
+                            <th>Size</th>
+                            <th>Price</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productsBody">
+                        <!-- Products will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="loadingMessage" class="loading hidden">Loading products...</div>
+            <div id="errorMessage" class="error-message hidden"></div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Product Modal -->
+    <div id="productModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add Product</h2>
+                <button class="close-btn" id="closeModal">&times;</button>
+            </div>
+            <form id="productForm">
+                <input type="hidden" id="productId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="sku">SKU *</label>
+                        <input type="text" id="sku" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="brand">Brand</label>
+                        <input type="text" id="brand">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="item">Item Name *</label>
+                    <input type="text" id="item" required>
+                </div>
+                <div class="form-group">
+                    <label for="category">Category *</label>
+                    <select id="category" required>
+                        <option value="">Select a category</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="pack">Pack</label>
+                        <input type="text" id="pack">
+                    </div>
+                    <div class="form-group">
+                        <label for="size">Size</label>
+                        <input type="text" id="size">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="price">Price *</label>
+                    <input type="text" id="price" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
+                </div>
+                <div id="modalError" class="error-message"></div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

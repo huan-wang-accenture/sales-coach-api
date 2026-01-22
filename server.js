@@ -14,6 +14,9 @@ app.use(cors()); // Enable CORS for all origins
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve static files from public directory
+app.use(express.static('public'));
+
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -241,8 +244,8 @@ let items = [
   { id: 198, SKU: "74746", PACK: "CSE", SIZE: "6/2.2#", BRAND: "CACAOB", ITEM: "COCOA EXTRA BRUTE, DUTCHED 22-24%", CATEGORY: "Cat 48 Cocoa-Cocoa Butter", PRICE: "22" }
 ];
 
-// Root endpoint
-app.get('/', (req, res) => {
+// API Info endpoint
+app.get('/api', (req, res) => {
   res.json({
     message: 'Sales Coach API',
     version: '1.0.0',
