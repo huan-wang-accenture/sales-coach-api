@@ -258,6 +258,7 @@ app.get('/api', (req, res) => {
       categories: 'GET /api/categories - Get all categories (requires auth)',
       itemsByCategory: 'GET /api/items/category/:category - Get items by category (requires auth)',
       search: 'GET /api/items/search?q=query - Search items (requires auth)',
+      filter: 'POST /api/items/filter - Filter items with body params: item, brand, category, minPrice, maxPrice (requires auth)',
       create: 'POST /api/items - Create new item (requires auth)',
       update: 'PUT /api/items/:id - Update item (requires auth)',
       delete: 'DELETE /api/items/:id - Delete item (requires auth)'
@@ -391,6 +392,64 @@ app.get('/api/items/search', authenticateToken, (req, res) => {
     count: results.length,
     query: query,
     data: results
+  });
+});
+
+// POST filter items with multiple criteria (body parameters)
+app.post('/api/items/filter', authenticateToken, (req, res) => {
+  const { item, brand, category, minPrice, maxPrice } = req.body;
+
+  let filtered = items;
+
+  // Filter by item name (case-insensitive contains)
+  if (item) {
+    const itemLower = item.toLowerCase();
+    filtered = filtered.filter(product =>
+      product.ITEM.toLowerCase().includes(itemLower)
+    );
+  }
+
+  // Filter by brand (case-insensitive contains)
+  if (brand) {
+    const brandLower = brand.toLowerCase();
+    filtered = filtered.filter(product =>
+      product.BRAND && product.BRAND.toLowerCase().includes(brandLower)
+    );
+  }
+
+  // Filter by category (case-insensitive contains)
+  if (category) {
+    const categoryLower = category.toLowerCase();
+    filtered = filtered.filter(product =>
+      product.CATEGORY.toLowerCase().includes(categoryLower)
+    );
+  }
+
+  // Filter by minimum price
+  if (minPrice !== undefined && minPrice !== null && minPrice !== '') {
+    const min = parseFloat(minPrice);
+    if (!isNaN(min)) {
+      filtered = filtered.filter(product =>
+        parseFloat(product.PRICE) >= min
+      );
+    }
+  }
+
+  // Filter by maximum price
+  if (maxPrice !== undefined && maxPrice !== null && maxPrice !== '') {
+    const max = parseFloat(maxPrice);
+    if (!isNaN(max)) {
+      filtered = filtered.filter(product =>
+        parseFloat(product.PRICE) <= max
+      );
+    }
+  }
+
+  res.json({
+    success: true,
+    count: filtered.length,
+    filters: { item, brand, category, minPrice, maxPrice },
+    data: filtered
   });
 });
 

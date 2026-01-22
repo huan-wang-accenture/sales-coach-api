@@ -85,6 +85,7 @@ The entire application lives in a single `server.js` file. There are no separate
 | GET | `/api/items/sku/:sku` | Get product by SKU code | Yes |
 | GET | `/api/items/category/:category` | Filter by category (case-insensitive) | Yes |
 | GET | `/api/items/search?q=query` | Full-text search across all fields | Yes |
+| POST | `/api/items/filter` | **Filter with body params** (item, brand, category, minPrice, maxPrice) - case-insensitive contains | Yes |
 | POST | `/api/items` | Create new product (requires: SKU, ITEM, CATEGORY, PRICE) | Yes |
 | PUT | `/api/items/:id` | Update product (supports partial updates) | Yes |
 | DELETE | `/api/items/:id` | Delete product | Yes |
@@ -208,6 +209,70 @@ curl -X DELETE https://sales-coach-api-xtzh.onrender.com/api/items/1 \
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
 ```
 
+**Filter Products with Multiple Criteria (POST with Body Parameters):**
+```bash
+curl -X POST https://sales-coach-api-xtzh.onrender.com/api/items/filter \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -d '{
+    "item": "MIX",
+    "brand": "WESTCO",
+    "category": "Cat 6",
+    "minPrice": 50,
+    "maxPrice": 300
+  }'
+```
+
+**Filter Endpoint Details:**
+- **Method**: POST (accepts parameters in request body)
+- **All parameters are optional** - omit any you don't need
+- **Case-insensitive contains matching** - searches for partial matches
+- **Parameters**:
+  - `item`: Search in Item name (e.g., "MIX" finds "BUTTERMILK BISCUIT MIX")
+  - `brand`: Filter by Brand (e.g., "west" finds "WESTCO")
+  - `category`: Filter by Category (e.g., "Cat 6" finds "Cat 6 Mix Cookie-Biscuit-Pancake-Churro")
+  - `minPrice`: Minimum price threshold (number)
+  - `maxPrice`: Maximum price threshold (number)
+
+**Example: Search for "BISCUIT" from "WESTCO" brand with price ≥ $200:**
+```bash
+curl -X POST https://sales-coach-api-xtzh.onrender.com/api/items/filter \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -d '{"item": "BISCUIT", "brand": "WESTCO", "minPrice": 200}'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "count": 2,
+  "filters": {"item": "BISCUIT", "brand": "WESTCO", "minPrice": 200},
+  "data": [
+    {
+      "id": 0,
+      "SKU": "10050",
+      "PACK": "BAG",
+      "SIZE": "50#",
+      "BRAND": "WESTCO",
+      "ITEM": "BUTTERMILK BISCUIT MIX",
+      "CATEGORY": "Cat 6 Mix Cookie-Biscuit-Pancake-Churro",
+      "PRICE": "212"
+    },
+    {
+      "id": 1,
+      "SKU": "10058",
+      "PACK": "BAG",
+      "SIZE": "50#",
+      "BRAND": "WESTCO",
+      "ITEM": "BISCUIT AND SCONE MIX S/O ",
+      "CATEGORY": "Cat 6 Mix Cookie-Biscuit-Pancake-Churro",
+      "PRICE": "203"
+    }
+  ]
+}
+```
+
 ### Automated Token Management (Bash Script)
 
 For convenience, you can automatically get the token and use it:
@@ -228,9 +293,17 @@ curl https://sales-coach-api-xtzh.onrender.com/api/items \
 
 For chatbot integration:
 1. **Authenticate**: Call `/api/login` to get a token (store it for 24 hours)
-2. **Query Products**: Use `/api/items/search?q=QUERY` to find products
+2. **Query Products**:
+   - **Recommended**: Use `POST /api/items/filter` with body parameters for flexible, combined filtering
+   - Alternative: Use `/api/items/search?q=QUERY` to search all fields
 3. **Get Details**: Use `/api/items/:id` or `/api/items/sku/:sku` for specific items
 4. **Real-time Sync**: Any changes made in the web UI are immediately reflected in API responses
+
+**Why use POST /api/items/filter for chatbots:**
+- Accepts parameters in request body (works with tools that only support one endpoint)
+- Combine multiple criteria in one request (item, brand, category, price range)
+- Case-insensitive partial matching (user-friendly)
+- Returns exactly what user asks for (precise results)
 
 ### Example Product Data
 
