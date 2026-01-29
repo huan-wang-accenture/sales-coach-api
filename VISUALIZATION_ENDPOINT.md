@@ -217,7 +217,7 @@ The body should be structured as:
 
 The endpoint now supports two response formats:
 
-**1. JSON format with base64 image (for Juji chatbot)**
+**1. JSON format with public image URL (for Juji chatbot)**
 
 Add to the **Headers** tab in Juji:
 ```
@@ -234,17 +234,28 @@ Response will be:
 {
   "success": true,
   "message": "Generated visualization for 13 items",
-  "image": "data:image/png;base64,iVBORw0KGgoAAAANS...",
-  "imageUrl": "data:image/png;base64,iVBORw0KGgoAAAANS...",
+  "imageUrl": "https://sales-coach-api-xtzh.onrender.com/visualizations/visualization-1738180000000.png",
+  "image": "https://sales-coach-api-xtzh.onrender.com/visualizations/visualization-1738180000000.png",
+  "filename": "visualization-1738180000000.png",
   "format": "png",
   "items": 13
 }
 ```
 
-To display in Juji chatbot:
-- Use the `image` or `imageUrl` field from the response
-- Configure Juji to render it as an image (check Juji's documentation for displaying images)
-- The data URI can be used directly in HTML: `<img src="{{response.image}}" />`
+**To display in Juji chatbot:**
+
+1. In **Response Mapping** tab:
+   - Path: `["imageUrl"]`
+   - Attribute: Name it something like `plotUrl`
+
+2. In your chatbot message template, use Juji's image display syntax:
+   - Check if Juji supports: `![Image](url)` (Markdown syntax)
+   - Or Juji's native image component
+   - The `imageUrl` field contains a direct link to the PNG file
+
+3. If Juji doesn't render images automatically, display the URL as a clickable link:
+   - "Here's your visualization: `(get-user-attribute-as-string "plotUrl")`"
+   - Users can click to view the image
 
 **2. Binary PNG format (for direct download)**
 
