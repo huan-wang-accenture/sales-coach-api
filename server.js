@@ -366,6 +366,62 @@ app.post('/api/login', async (req, res) => {
   });
 });
 
+// Diagnostic endpoint to test canvas dependencies
+app.get('/api/test-canvas', authenticateToken, async (req, res) => {
+  try {
+    // Test 1: Check if canvas module loads
+    const canvasModule = require('canvas');
+
+    // Test 2: Try to create a simple canvas
+    const testCanvas = createCanvas(100, 100);
+    const ctx = testCanvas.getContext('2d');
+    ctx.fillStyle = 'blue';
+    ctx.fillRect(0, 0, 50, 50);
+
+    // Test 3: Try to create ChartJSNodeCanvas instance
+    const chartCanvas = new ChartJSNodeCanvas({
+      width: 200,
+      height: 200,
+      backgroundColour: 'white'
+    });
+
+    // Test 4: Generate a simple chart
+    const simpleChart = await chartCanvas.renderToBuffer({
+      type: 'bar',
+      data: {
+        labels: ['Test'],
+        datasets: [{
+          label: 'Test Data',
+          data: [1],
+          backgroundColor: '#36A2EB'
+        }]
+      },
+      options: {
+        responsive: false
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Canvas dependencies are working correctly',
+      tests: {
+        canvasModule: 'OK',
+        createCanvas: 'OK',
+        chartJSNodeCanvas: 'OK',
+        renderChart: 'OK',
+        chartBufferSize: simpleChart.length
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Canvas dependency test failed',
+      details: error.message,
+      stack: error.stack
+    });
+  }
+});
+
 // GET all items
 app.get('/api/items', authenticateToken, (req, res) => {
   res.json({

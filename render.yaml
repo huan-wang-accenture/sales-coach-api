@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: sales-coach-api
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: JWT_SECRET
+        sync: false
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD_HASH
+        sync: false
+      - key: JUJI_API_URL
+        sync: false
+      - key: JUJI_ENGAGEMENT_ID
+        sync: false
+      - key: JUJI_API_KEY
+        sync: false
