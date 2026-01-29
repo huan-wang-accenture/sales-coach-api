@@ -827,10 +827,31 @@ app.post('/api/items/visualize', authenticateToken, async (req, res) => {
     // Convert canvas to PNG buffer
     const buffer = canvas.toBuffer('image/png');
 
-    // Send PNG as response
-    res.set('Content-Type', 'image/png');
-    res.set('Content-Disposition', 'attachment; filename="product-visualization.png"');
-    res.send(buffer);
+    // Check if client wants JSON response with base64 (for Juji integration)
+    const acceptHeader = req.headers['accept'] || '';
+    const preferJson = acceptHeader.includes('application/json') || req.query.format === 'json';
+
+    if (preferJson) {
+      // Return base64-encoded image in JSON for Juji chatbot
+      const base64Image = buffer.toString('base64');
+      const dataUri = `data:image/png;base64,${base64Image}`;
+
+      console.log('Returning base64-encoded image, size:', base64Image.length);
+
+      res.json({
+        success: true,
+        message: `Generated visualization for ${data.length} items`,
+        image: dataUri,
+        imageUrl: dataUri,
+        format: 'png',
+        items: data.length
+      });
+    } else {
+      // Return raw PNG binary (for direct download)
+      res.set('Content-Type', 'image/png');
+      res.set('Content-Disposition', 'attachment; filename="product-visualization.png"');
+      res.send(buffer);
+    }
 
   } catch (error) {
     console.error('Visualization error:', error);

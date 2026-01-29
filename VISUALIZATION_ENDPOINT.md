@@ -213,6 +213,43 @@ The body should be structured as:
 }
 ```
 
+### Displaying the Image in Juji
+
+The endpoint now supports two response formats:
+
+**1. JSON format with base64 image (for Juji chatbot)**
+
+Add to the **Headers** tab in Juji:
+```
+Accept: application/json
+```
+
+Or add query parameter to the URL:
+```
+https://sales-coach-api-xtzh.onrender.com/api/items/visualize?format=json
+```
+
+Response will be:
+```json
+{
+  "success": true,
+  "message": "Generated visualization for 13 items",
+  "image": "data:image/png;base64,iVBORw0KGgoAAAANS...",
+  "imageUrl": "data:image/png;base64,iVBORw0KGgoAAAANS...",
+  "format": "png",
+  "items": 13
+}
+```
+
+To display in Juji chatbot:
+- Use the `image` or `imageUrl` field from the response
+- Configure Juji to render it as an image (check Juji's documentation for displaying images)
+- The data URI can be used directly in HTML: `<img src="{{response.image}}" />`
+
+**2. Binary PNG format (for direct download)**
+
+If no `Accept: application/json` header, returns raw PNG binary data suitable for saving to file.
+
 ---
 
 ## Need Help?
