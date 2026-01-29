@@ -424,6 +424,54 @@ app.get('/api/test-canvas', authenticateToken, async (req, res) => {
   }
 });
 
+// Cleanup old visualization files endpoint
+app.delete('/api/visualizations/cleanup', authenticateToken, (req, res) => {
+  try {
+    const visualizationsDir = path.join(__dirname, 'public', 'visualizations');
+
+    if (!fs.existsSync(visualizationsDir)) {
+      return res.json({
+        success: true,
+        message: 'Visualizations directory does not exist',
+        deletedCount: 0
+      });
+    }
+
+    const maxAge = parseInt(req.query.maxAge) || 60 * 60 * 1000; // Default: 1 hour
+    const now = Date.now();
+    const files = fs.readdirSync(visualizationsDir);
+    let deletedCount = 0;
+    const deletedFiles = [];
+
+    files.forEach(file => {
+      if (file.startsWith('visualization-') && file.endsWith('.png')) {
+        const filePath = path.join(visualizationsDir, file);
+        const stats = fs.statSync(filePath);
+        const fileAge = now - stats.mtimeMs;
+
+        if (fileAge > maxAge) {
+          fs.unlinkSync(filePath);
+          deletedCount++;
+          deletedFiles.push({ file, ageMinutes: Math.round(fileAge / 60000) });
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      message: `Cleaned up ${deletedCount} file(s) older than ${Math.round(maxAge / 60000)} minutes`,
+      deletedCount,
+      deletedFiles,
+      maxAgeMinutes: Math.round(maxAge / 60000)
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Cleanup failed: ' + error.message
+    });
+  }
+});
+
 // GET all items
 app.get('/api/items', authenticateToken, (req, res) => {
   res.json({
@@ -842,6 +890,34 @@ app.post('/api/items/visualize', authenticateToken, async (req, res) => {
         fs.mkdirSync(visualizationsDir, { recursive: true });
       }
 
+      // Cleanup old files (older than 1 hour)
+      const ONE_HOUR = 60 * 60 * 1000; // 1 hour in milliseconds
+      const now = Date.now();
+
+      try {
+        const files = fs.readdirSync(visualizationsDir);
+        let deletedCount = 0;
+
+        files.forEach(file => {
+          if (file.startsWith('visualization-') && file.endsWith('.png')) {
+            const filePath = path.join(visualizationsDir, file);
+            const stats = fs.statSync(filePath);
+            const fileAge = now - stats.mtimeMs;
+
+            if (fileAge > ONE_HOUR) {
+              fs.unlinkSync(filePath);
+              deletedCount++;
+            }
+          }
+        });
+
+        if (deletedCount > 0) {
+          console.log(`Cleaned up ${deletedCount} old visualization file(s)`);
+        }
+      } catch (cleanupError) {
+        console.error('Cleanup error (non-fatal):', cleanupError.message);
+      }
+
       // Generate unique filename with timestamp
       const timestamp = Date.now();
       const filename = `visualization-${timestamp}.png`;
@@ -864,7 +940,8 @@ app.post('/api/items/visualize', authenticateToken, async (req, res) => {
         image: imageUrl,
         filename: filename,
         format: 'png',
-        items: data.length
+        items: data.length,
+        expiresIn: '1 hour'
       });
     } else {
       // Return raw PNG binary (for direct download)

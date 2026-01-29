@@ -263,6 +263,69 @@ If no `Accept: application/json` header, returns raw PNG binary data suitable fo
 
 ---
 
+## File Cleanup and Storage
+
+### Automatic Cleanup
+
+Generated visualization PNG files are automatically cleaned up:
+
+- **Location**: Stored in `public/visualizations/` directory on the server
+- **Lifetime**: Files older than **1 hour** are automatically deleted
+- **When**: Cleanup runs each time a new visualization is generated
+- **Non-blocking**: Cleanup errors are logged but don't affect the visualization generation
+
+### Manual Cleanup
+
+You can manually trigger cleanup using the DELETE endpoint:
+
+```bash
+# Clean up files older than 1 hour (default)
+curl -X DELETE https://sales-coach-api-xtzh.onrender.com/api/visualizations/cleanup \
+  -H "Authorization: Bearer $TOKEN"
+
+# Clean up files older than 30 minutes
+curl -X DELETE "https://sales-coach-api-xtzh.onrender.com/api/visualizations/cleanup?maxAge=1800000" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Clean up ALL visualization files (maxAge=0)
+curl -X DELETE "https://sales-coach-api-xtzh.onrender.com/api/visualizations/cleanup?maxAge=0" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Query Parameters:**
+- `maxAge`: Maximum age in milliseconds (default: 3600000 = 1 hour)
+  - 30 minutes: `1800000`
+  - 5 minutes: `300000`
+  - Delete all: `0`
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Cleaned up 5 file(s) older than 60 minutes",
+  "deletedCount": 5,
+  "deletedFiles": [
+    {"file": "visualization-1738180000000.png", "ageMinutes": 65},
+    {"file": "visualization-1738181000000.png", "ageMinutes": 62}
+  ],
+  "maxAgeMinutes": 60
+}
+```
+
+### On Render's Free Tier
+
+**Important**: On Render's free tier, the entire `public/visualizations/` directory is ephemeral:
+- Files are cleared on server restart
+- Restarts happen during deployments
+- Restarts happen after periods of inactivity
+- This provides an additional cleanup layer
+
+### Best Practices
+
+1. **For Juji Integration**: Images remain accessible for at least 1 hour - plenty of time for users to view them in the chat
+2. **Monitor Storage**: Use the cleanup endpoint periodically if you generate many visualizations
+3. **Plan for Expiration**: Inform users that visualization links expire after 1 hour
+
 ## Need Help?
 
 1. **Check diagnostic endpoint first**: `/api/test-canvas`
