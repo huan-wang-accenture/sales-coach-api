@@ -570,14 +570,23 @@ app.post('/api/items/filter', authenticateToken, (req, res) => {
 // POST generate visualization PNG from filtered items
 app.post('/api/items/visualize', authenticateToken, async (req, res) => {
   try {
+    // Log incoming request for debugging
+    console.log('=== Visualization Request Received ===');
+    console.log('Request body type:', typeof req.body);
+    console.log('Request body keys:', Object.keys(req.body));
+    console.log('Request body:', JSON.stringify(req.body).substring(0, 500));
+
     const { data } = req.body;
 
     if (!data || !Array.isArray(data) || data.length === 0) {
+      console.log('Invalid data - type:', typeof data, 'isArray:', Array.isArray(data), 'length:', data?.length);
       return res.status(400).json({
         success: false,
         error: 'Invalid or empty data array'
       });
     }
+
+    console.log(`Processing visualization for ${data.length} items`);
 
     // Process data for charts
     const brandCounts = {};
