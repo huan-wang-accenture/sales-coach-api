@@ -576,7 +576,39 @@ app.post('/api/items/visualize', authenticateToken, async (req, res) => {
     console.log('Request body keys:', Object.keys(req.body));
     console.log('Request body:', JSON.stringify(req.body).substring(0, 500));
 
-    const { data } = req.body;
+    let { data } = req.body;
+
+    // If data is a string, try to parse it
+    if (typeof data === 'string') {
+      console.log('Data is a string, attempting to parse...');
+      try {
+        // First, try to convert EDN format to JSON
+        // EDN format: {"id" 126, "SKU" "74763"}
+        // JSON format: {"id": 126, "SKU": "74763"}
+
+        let jsonString = data;
+
+        // Add colons between keys and values (handles strings, numbers, objects, arrays)
+        // Pattern: "key" <whitespace> <value>
+        jsonString = jsonString.replace(/"(\w+)"\s+/g, '"$1": ');
+
+        // Add commas between objects
+        jsonString = jsonString.replace(/}\s*{/g, '}, {');
+
+        console.log('Converted string (first 500 chars):', jsonString.substring(0, 500));
+
+        // Parse to JSON
+        data = JSON.parse(jsonString);
+        console.log('Successfully parsed string to array, length:', data.length);
+      } catch (parseError) {
+        console.log('Failed to parse string:', parseError.message);
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid data format - could not parse string to JSON',
+          details: parseError.message
+        });
+      }
+    }
 
     if (!data || !Array.isArray(data) || data.length === 0) {
       console.log('Invalid data - type:', typeof data, 'isArray:', Array.isArray(data), 'length:', data?.length);
