@@ -1,3 +1,5 @@
+console.log('app.js loading...');
+
 // API Base URL
 const API_BASE = window.location.origin;
 
@@ -6,6 +8,10 @@ let token = localStorage.getItem('token') || null;
 let allProducts = [];
 let allCategories = [];
 let currentEditId = null;
+
+// Chat state
+let engagementId = null;
+let username = null;
 
 // DOM Elements
 const loginScreen = document.getElementById('loginScreen');
@@ -34,6 +40,21 @@ const modalError = document.getElementById('modalError');
 const loadingMessage = document.getElementById('loadingMessage');
 const errorMessage = document.getElementById('errorMessage');
 
+// Chat DOM Elements
+const chatPanel = document.getElementById('chatPanel');
+const mainContent = document.querySelector('.main-content');
+const openChatBtn = document.getElementById('openChatBtn');
+const closeChatBtn = document.getElementById('closeChatBtn');
+const jujiChatIframe = document.getElementById('jujiChatIframe');
+
+console.log('Chat DOM elements:', {
+    chatPanel,
+    mainContent,
+    openChatBtn,
+    closeChatBtn,
+    jujiChatIframe
+});
+
 // Initialize
 if (token) {
     showApp();
@@ -57,6 +78,10 @@ addProductBtn.addEventListener('click', () => openProductModal());
 closeModal.addEventListener('click', closeProductModal);
 cancelBtn.addEventListener('click', closeProductModal);
 productForm.addEventListener('submit', handleProductSubmit);
+
+// Chat Event Listeners
+openChatBtn.addEventListener('click', toggleChatPanel);
+closeChatBtn.addEventListener('click', toggleChatPanel);
 
 // API Functions
 async function apiCall(endpoint, options = {}) {
@@ -115,6 +140,16 @@ async function handleLogin(e) {
 }
 
 function handleLogout() {
+    // Clear chat iframe
+    if (jujiChatIframe) {
+        jujiChatIframe.setAttribute('src', '');
+    }
+
+    // Clear chat session
+    engagementId = null;
+    username = null;
+
+    // Clear authentication
     token = null;
     localStorage.removeItem('token');
     showLogin();
@@ -373,3 +408,96 @@ function showError(message) {
 function hideError() {
     errorMessage.classList.add('hidden');
 }
+
+// ============================================================
+// CHAT FUNCTIONS
+// ============================================================
+
+// Toggle chat panel (open/close)
+async function toggleChatPanel() {
+    console.log('toggleChatPanel called');
+    console.log('chatPanel:', chatPanel);
+    console.log('jujiChatIframe:', jujiChatIframe);
+
+    const isOpen = chatPanel.classList.contains('open');
+
+    if (isOpen) {
+        // Close panel
+        chatPanel.classList.remove('open');
+        mainContent.classList.remove('chat-open');
+        console.log('Chat panel closed');
+    } else {
+        // Open panel
+        chatPanel.classList.remove('hidden');
+        chatPanel.classList.add('open');
+        mainContent.classList.add('chat-open');
+        console.log('Chat panel opened');
+
+        // Load Juji chatbot iframe if not already loaded
+        const currentSrc = jujiChatIframe.getAttribute('src');
+        console.log('iframe src attribute:', currentSrc);
+        console.log('iframe src property:', jujiChatIframe.src);
+
+        if (!currentSrc || currentSrc === '') {
+            console.log('Loading Juji chatbot...');
+            await loadJujiChatbot();
+        } else {
+            console.log('Chatbot already loaded');
+        }
+    }
+}
+
+// Load Juji chatbot iframe
+async function loadJujiChatbot() {
+    console.log('loadJujiChatbot function called');
+    try {
+        console.log('Calling /api/chatbot/start-session...');
+        const response = await apiCall('/api/chatbot/start-session', {
+            method: 'POST'
+        });
+
+        console.log('Response received:', response);
+
+        if (response.success) {
+            engagementId = response.engagementId;
+            username = response.username;
+
+            console.log('Loading Juji chatbot:', { engagementId, username });
+
+            // Use chat URL from backend (configured via .env)
+            const chatUrl = response.chatUrl;
+            jujiChatIframe.setAttribute('src', chatUrl);
+
+            console.log('Juji chatbot loaded:', chatUrl);
+            console.log('iframe now has src:', jujiChatIframe.getAttribute('src'));
+        } else {
+            throw new Error(response.error || 'Failed to get chat URL');
+        }
+    } catch (error) {
+        console.error('Chatbot load error:', error);
+        alert('Sorry, could not load the chatbot. Please try again later.');
+    }
+}
+
+// Search products (for chatbot integration)
+async function searchProducts(query) {
+    try {
+        const response = await apiCall('/api/chatbot/search-products', {
+            method: 'POST',
+            body: JSON.stringify({ query })
+        });
+
+        if (response.success) {
+            appendMessage(response.message, 'bot');
+        } else {
+            appendMessage('Sorry, I had trouble searching for products.', 'bot');
+        }
+    } catch (error) {
+        console.error('Product search error:', error);
+        appendMessage('Sorry, I encountered an error while searching.', 'bot');
+    }
+}
+
+// ============================================================
+// END CHAT FUNCTIONS
+// ============================================================

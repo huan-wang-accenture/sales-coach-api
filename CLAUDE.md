@@ -35,11 +35,22 @@ Environment variables:
 - `JWT_SECRET`: Secret key for signing JWT tokens
 - `ADMIN_USERNAME`: Admin username (default: admin)
 - `ADMIN_PASSWORD_HASH`: Bcrypt hash of admin password
+- `JUJI_API_URL`: Juji chat URL base (e.g., https://juji.ai/pre-chat or https://juji.ai/chat)
+- `JUJI_ENGAGEMENT_ID`: Your Juji engagement ID (required for chatbot)
+- `JUJI_API_KEY`: Your Juji API key (required for chatbot - currently unused but kept for future use)
 
 To generate a new password hash:
 ```bash
 node -e "const bcrypt = require('bcrypt'); bcrypt.hash('YOUR_PASSWORD', 10, (err, hash) => console.log(hash));"
 ```
+
+To obtain your Juji API key:
+1. Login to https://juji.io
+2. Go to Account settings (click your profile/avatar)
+3. Navigate to "APIKEY" section
+4. Click "Generate New API Key"
+5. **IMPORTANT**: Copy the key immediately - it's only shown once!
+6. Paste into your .env file
 
 ## Architecture
 
@@ -89,6 +100,15 @@ The entire application lives in a single `server.js` file. There are no separate
 | POST | `/api/items` | Create new product (requires: SKU, ITEM, CATEGORY, PRICE) | Yes |
 | PUT | `/api/items/:id` | Update product (supports partial updates) | Yes |
 | DELETE | `/api/items/:id` | Delete product | Yes |
+
+### Chatbot Endpoints
+
+| Method | Endpoint | Purpose | Auth Required |
+|--------|----------|---------|---------------|
+| POST | `/api/chatbot/start-session` | Get Juji chat URL for iframe embedding | Yes |
+| GET | `/api/chatbot/session` | Get current chat session info | Yes |
+| DELETE | `/api/chatbot/end-session` | Clean up chat session | Yes |
+| POST | `/api/chatbot/search-products` | Natural language product search (available but not used by iframe) | Yes |
 
 ### Authentication Flow
 1. **Login**: POST to `/api/login` with `{"username": "admin", "password": "password123"}`
@@ -399,6 +419,133 @@ The 8 product categories are:
 - Cat 48 Cocoa-Cocoa Butter
 - Cat 49 Branded Chocolate
 - Cat 50 Chocolate
+
+## Chatbot Integration
+
+### Overview
+The application includes Juji Cognitive AI Chatbot integration for natural language product queries. Users can interact with an AI assistant to search for products, get recommendations, and learn about inventory.
+
+### Architecture
+- **Backend**: Provides session management and returns Juji chat URL to frontend
+- **Frontend**: Embeds Juji chatbot using iframe (official Juji integration method)
+- **Session Management**: In-memory session storage (no persistence)
+- **Integration Method**: iframe embedding - simple, reliable, and officially supported by Juji
+
+### Using the Chatbot
+
+#### Web UI Access
+1. Login to the application
+2. Click "💬 Chat with AI" button in the navbar
+3. Chat panel slides in from the right with Juji chatbot embedded
+4. Interact with the AI assistant directly in the iframe
+5. Ask about products naturally through the Juji chatbot interface
+6. Click "×" button to close the chat panel
+
+#### Chatbot Features
+- **Full Juji Experience**: Complete Juji chatbot interface with all features (voice, attachments, etc.)
+- **Side Panel UI**: Chat opens in a sliding panel alongside the product table
+- **Fresh Sessions**: Each time you open the chat, a new session starts
+- **Official Integration**: Uses Juji's official iframe embedding method for maximum reliability
+- **Always Up-to-date**: Juji updates automatically - no code changes needed
+
+### Chatbot Configuration
+
+#### Required Environment Variables
+```env
+JUJI_API_URL=https://juji.ai/pre-chat
+JUJI_ENGAGEMENT_ID=your-engagement-id-here
+JUJI_API_KEY=your-api-key-here
+```
+
+**Note**: The `JUJI_API_URL` should point to your Juji chat endpoint. Common values:
+- `https://juji.ai/pre-chat` (for pre-chat engagements)
+- `https://juji.ai/chat` (for standard chat engagements)
+
+The backend will construct the full URL as `${JUJI_API_URL}/${JUJI_ENGAGEMENT_ID}` and return it to the frontend, which loads it in an iframe.
+
+#### Obtaining Juji Credentials
+
+**Get your Engagement ID:**
+1. Login to https://juji.io
+2. Navigate to your chatbot project
+3. The engagement ID is in the URL or project settings
+
+**Generate API Key (Optional for current implementation):**
+1. Login to https://juji.io
+2. Go to Account settings (click your profile/avatar)
+3. Navigate to "APIKEY" section
+4. Click "Generate New API Key"
+5. **IMPORTANT**: Copy the key immediately - it's only shown once!
+6. Paste into your .env file
+
+**Note**: The current iframe-based implementation doesn't require API key authentication. The API key is stored for potential future backend API integrations.
+
+#### Testing Juji Configuration
+```bash
+# Get authentication token first
+TOKEN=$(curl -s -X POST http://localhost:3000/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "password123"}' \
+  | grep -o '"token":"[^"]*' | cut -d'"' -f4)
+
+# Test chatbot session creation
+curl -X POST http://localhost:3000/api/chatbot/start-session \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json"
+```
+
+Expected response:
+```json
+{
+  "success": true,
+  "engagementId": "69728a21-fc76-4c23-9d11-734e015f112a",
+  "username": "admin",
+  "wsAuthToken": "your-api-key",
+  "wsUrl": "wss://juji.ai/pre-chat",
+  "chatUrl": "https://juji.ai/pre-chat/69728a21-fc76-4c23-9d11-734e015f112a"
+}
+```
+
+The `chatUrl` field shows the full URL that will be loaded in the iframe.
+
+### Troubleshooting
+
+#### Chat panel opens but iframe is blank
+- **Hard refresh browser**: Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows) to clear cached JavaScript
+- Check browser console (F12) for errors
+- Verify `JUJI_API_URL` and `JUJI_ENGAGEMENT_ID` are set correctly in .env
+- Test the URL directly: Open `${JUJI_API_URL}/${JUJI_ENGAGEMENT_ID}` in a new browser tab
+- Check if engagement is deployed in Juji dashboard at https://juji.io
+
+#### Chatbot URL is incorrect
+- Check server logs when opening chat - should show: `Chat URL: https://juji.ai/pre-chat/...`
+- Verify .env file has correct `JUJI_API_URL` (either `/pre-chat` or `/chat`)
+- Restart server after changing .env: `npm start`
+- Test endpoint returns correct URL: `curl -X POST http://localhost:3000/api/chatbot/start-session -H "Authorization: Bearer <token>"`
+
+#### iframe shows "Unknown server resource" or 404
+- Wrong `JUJI_API_URL` - try switching between:
+  - `https://juji.ai/pre-chat`
+  - `https://juji.ai/chat`
+- Verify your engagement ID is correct
+- Check if engagement is deployed in Juji dashboard
+
+#### Chat panel doesn't open
+- Check browser console for JavaScript errors
+- Verify DOM elements exist: `document.getElementById('chatPanel')`
+- Check CSS classes: chat panel should have classes `chat-panel` and `open` when clicked
+- Hard refresh browser to clear cache
+
+#### Environment variable changes not taking effect
+- Restart the server after changing .env: `npm start`
+- Kill any existing server processes: `lsof -ti:3000 | xargs kill -9`
+- Check dotenv is loading: Look for `[dotenv@...] injecting env` message in server logs
+
+#### Session issues
+- Clear localStorage: `localStorage.clear()` in browser console
+- Logout and login again
+- Check backend session: `curl -H "Authorization: Bearer <token>" http://localhost:3000/api/chatbot/session`
+- Restart server to clear in-memory sessions
 
 ## Key Implementation Details
 

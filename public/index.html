@@ -33,12 +33,16 @@
             <div class="nav-content">
                 <h1>Sales Coach - Product Manager</h1>
                 <div class="nav-actions">
+                    <button id="openChatBtn" class="btn btn-chat">💬 Chat with AI</button>
                     <span id="userInfo" class="user-info"></span>
                     <button id="logoutBtn" class="btn btn-secondary">Logout</button>
                 </div>
             </div>
         </nav>
 
+        <div class="main-layout">
+            <!-- Main Content Area -->
+            <div class="main-content">
         <div class="container">
             <!-- Stats -->
             <div class="stats-container">
@@ -111,6 +115,31 @@
             <div id="loadingMessage" class="loading hidden">Loading products...</div>
             <div id="errorMessage" class="error-message hidden"></div>
         </div>
+            </div>
+            <!-- End Main Content -->
+
+            <!-- Chat Side Panel -->
+            <div id="chatPanel" class="chat-panel hidden">
+                <div class="chat-container">
+                    <!-- Header -->
+                    <div class="chat-header">
+                        <h2>AI Assistant</h2>
+                        <button id="closeChatBtn" class="btn btn-close">&times;</button>
+                    </div>
+
+                    <!-- Juji Chatbot iframe -->
+                    <iframe
+                        id="jujiChatIframe"
+                        src=""
+                        frameborder="0"
+                        style="width: 100%; height: calc(100% - 60px); border: none;"
+                        allow="microphone"
+                    ></iframe>
+                </div>
+            </div>
+            <!-- End Chat Panel -->
+        </div>
+        <!-- End Main Layout -->
     </div>
 
     <!-- Add/Edit Product Modal -->
