@@ -33,3 +33,4 @@ coverage/
 
 # Test visualization outputs
 *-visualization.png
+public/visualizations/*.png

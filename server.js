@@ -6,6 +6,8 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 const { createCanvas } = require('canvas');
+const fs = require('fs');
+const path = require('path');
 const app = express();
 
 // Configuration
@@ -832,17 +834,35 @@ app.post('/api/items/visualize', authenticateToken, async (req, res) => {
     const preferJson = acceptHeader.includes('application/json') || req.query.format === 'json';
 
     if (preferJson) {
-      // Return base64-encoded image in JSON for Juji chatbot
-      const base64Image = buffer.toString('base64');
-      const dataUri = `data:image/png;base64,${base64Image}`;
+      // Save image to public/visualizations directory
+      const visualizationsDir = path.join(__dirname, 'public', 'visualizations');
 
-      console.log('Returning base64-encoded image, size:', base64Image.length);
+      // Create directory if it doesn't exist
+      if (!fs.existsSync(visualizationsDir)) {
+        fs.mkdirSync(visualizationsDir, { recursive: true });
+      }
+
+      // Generate unique filename with timestamp
+      const timestamp = Date.now();
+      const filename = `visualization-${timestamp}.png`;
+      const filepath = path.join(visualizationsDir, filename);
+
+      // Save the file
+      fs.writeFileSync(filepath, buffer);
+
+      // Construct public URL
+      const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+      const imageUrl = `${baseUrl}/visualizations/${filename}`;
+
+      console.log('Saved visualization to:', filepath);
+      console.log('Public URL:', imageUrl);
 
       res.json({
         success: true,
         message: `Generated visualization for ${data.length} items`,
-        image: dataUri,
-        imageUrl: dataUri,
+        imageUrl: imageUrl,
+        image: imageUrl,
+        filename: filename,
         format: 'png',
         items: data.length
       });
