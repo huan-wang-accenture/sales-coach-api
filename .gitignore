@@ -30,3 +30,6 @@ build/
 
 # Testing
 coverage/
+
+# Test visualization outputs
+*-visualization.png

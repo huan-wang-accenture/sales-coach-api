@@ -97,6 +97,7 @@ The entire application lives in a single `server.js` file. There are no separate
 | GET | `/api/items/category/:category` | Filter by category (case-insensitive) | Yes |
 | GET | `/api/items/search?q=query` | Full-text search across all fields | Yes |
 | POST | `/api/items/filter` | **Filter with body params** (item, brand, category, minPrice, maxPrice) - case-insensitive contains | Yes |
+| POST | `/api/items/visualize` | **Generate PNG visualization** (pie chart, histogram, table) from items data | Yes |
 | POST | `/api/items` | Create new product (requires: SKU, ITEM, CATEGORY, PRICE) | Yes |
 | PUT | `/api/items/:id` | Update product (supports partial updates) | Yes |
 | DELETE | `/api/items/:id` | Delete product | Yes |
@@ -359,6 +360,121 @@ curl -X POST https://sales-coach-api-xtzh.onrender.com/api/items/filter \
   ]
 }
 ```
+
+### Visualization Endpoint
+
+The `/api/items/visualize` endpoint generates a PNG image with visualizations of your product data.
+
+**What it generates:**
+- **Pie Chart**: Distribution of products by brand (top 10 brands)
+- **Histogram**: Price distribution across 10 bins
+- **Table**: Detailed product information (ITEM, SKU, PACK, SIZE, BRAND, PRICE) - shows up to 30 records
+
+**Input Format:**
+```json
+{
+  "data": [
+    {
+      "id": 0,
+      "SKU": "10050",
+      "PACK": "BAG",
+      "SIZE": "50#",
+      "BRAND": "WESTCO",
+      "ITEM": "BUTTERMILK BISCUIT MIX",
+      "CATEGORY": "Cat 6 Mix Cookie-Biscuit-Pancake-Churro",
+      "PRICE": "212"
+    },
+    ...more items...
+  ]
+}
+```
+
+**Output:** PNG image (1200x1600 pixels, ~250KB)
+
+#### Usage Example 1: Visualize Filtered Data
+
+**Step 1: Filter items**
+```bash
+curl -X POST https://sales-coach-api-xtzh.onrender.com/api/items/filter \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -d '{
+    "brand": "WESTCO",
+    "minPrice": 100,
+    "maxPrice": 300
+  }' > filtered_data.json
+```
+
+**Step 2: Generate visualization**
+```bash
+curl -X POST https://sales-coach-api-xtzh.onrender.com/api/items/visualize \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -d @filtered_data.json \
+  --output product-visualization.png
+```
+
+**Step 3: View the PNG**
+```bash
+open product-visualization.png  # Mac
+xdg-open product-visualization.png  # Linux
+start product-visualization.png  # Windows
+```
+
+#### Usage Example 2: One-Line Command
+
+```bash
+# Get token
+TOKEN=$(curl -s -X POST https://sales-coach-api-xtzh.onrender.com/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "password123"}' | jq -r '.token')
+
+# Filter and visualize in one pipeline
+curl -s -X POST https://sales-coach-api-xtzh.onrender.com/api/items/filter \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"category": "chocolate"}' | \
+jq '{data: .data}' | \
+curl -X POST https://sales-coach-api-xtzh.onrender.com/api/items/visualize \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d @- \
+  --output chocolate-products.png
+```
+
+#### Usage Example 3: Visualize All Products
+
+```bash
+# Get all items and visualize
+curl -s https://sales-coach-api-xtzh.onrender.com/api/items \
+  -H "Authorization: Bearer $TOKEN" | \
+curl -X POST https://sales-coach-api-xtzh.onrender.com/api/items/visualize \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d @- \
+  --output all-products.png
+```
+
+#### Image Specifications
+
+| Property | Value |
+|----------|-------|
+| **Dimensions** | 1200 x 1600 pixels |
+| **Format** | PNG (RGBA) |
+| **File Size** | ~200-300KB |
+| **Charts** | 2 charts side-by-side (550x400 each) |
+| **Table** | Up to 30 rows displayed |
+| **Colors** | 10 distinct colors for pie chart |
+| **Background** | White |
+
+#### Notes
+
+- The endpoint accepts the same data format returned by `/api/items` and `/api/items/filter`
+- Brand pie chart shows top 10 brands by count
+- Price histogram automatically calculates optimal bins
+- Table shows first 30 products (indicates if more exist)
+- PNG is optimized for both screen display and printing
+- Authentication required (JWT token)
 
 ### Automated Token Management (Bash Script)
 

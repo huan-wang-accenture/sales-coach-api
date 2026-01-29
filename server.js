@@ -4,6 +4,8 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
+const { createCanvas } = require('canvas');
 const app = express();
 
 // Configuration
@@ -314,6 +316,7 @@ app.get('/api', (req, res) => {
       itemsByCategory: 'GET /api/items/category/:category - Get items by category (requires auth)',
       search: 'GET /api/items/search?q=query - Search items (requires auth)',
       filter: 'POST /api/items/filter - Filter items with body params: item, brand, category, minPrice, maxPrice (requires auth)',
+      visualize: 'POST /api/items/visualize - Generate PNG visualization (pie chart, histogram, table) from items data (requires auth)',
       create: 'POST /api/items - Create new item (requires auth)',
       update: 'PUT /api/items/:id - Update item (requires auth)',
       delete: 'DELETE /api/items/:id - Delete item (requires auth)'
@@ -506,6 +509,239 @@ app.post('/api/items/filter', authenticateToken, (req, res) => {
     filters: { item, brand, category, minPrice, maxPrice },
     data: filtered
   });
+});
+
+// POST generate visualization PNG from filtered items
+app.post('/api/items/visualize', authenticateToken, async (req, res) => {
+  try {
+    const { data } = req.body;
+
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid or empty data array'
+      });
+    }
+
+    // Process data for charts
+    const brandCounts = {};
+    const prices = [];
+
+    data.forEach(item => {
+      const brand = item.BRAND || 'Unknown';
+      brandCounts[brand] = (brandCounts[brand] || 0) + 1;
+      prices.push(parseFloat(item.PRICE) || 0);
+    });
+
+    // Sort brands by count for better visualization
+    const sortedBrands = Object.entries(brandCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10); // Top 10 brands
+
+    const brandLabels = sortedBrands.map(([brand]) => brand);
+    const brandData = sortedBrands.map(([, count]) => count);
+
+    // Create histogram bins for prices
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const binCount = 10;
+    const binSize = (maxPrice - minPrice) / binCount;
+    const bins = Array(binCount).fill(0);
+    const binLabels = [];
+
+    for (let i = 0; i < binCount; i++) {
+      const binStart = minPrice + i * binSize;
+      const binEnd = binStart + binSize;
+      binLabels.push(`$${Math.round(binStart)}-${Math.round(binEnd)}`);
+
+      prices.forEach(price => {
+        if (price >= binStart && (i === binCount - 1 ? price <= binEnd : price < binEnd)) {
+          bins[i]++;
+        }
+      });
+    }
+
+    // Generate charts
+    const width = 1200;
+    const height = 1600;
+    const chartWidth = 550;
+    const chartHeight = 400;
+
+    const chartJSNodeCanvas = new ChartJSNodeCanvas({
+      width: chartWidth,
+      height: chartHeight,
+      backgroundColour: 'white'
+    });
+
+    // Pie chart configuration
+    const pieChartConfig = {
+      type: 'pie',
+      data: {
+        labels: brandLabels,
+        datasets: [{
+          data: brandData,
+          backgroundColor: [
+            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+            '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#FF6384'
+          ]
+        }]
+      },
+      options: {
+        responsive: false,
+        plugins: {
+          title: {
+            display: true,
+            text: 'Brand Distribution',
+            font: { size: 20 }
+          },
+          legend: {
+            position: 'right',
+            labels: { font: { size: 12 } }
+          }
+        }
+      }
+    };
+
+    // Histogram configuration
+    const histogramConfig = {
+      type: 'bar',
+      data: {
+        labels: binLabels,
+        datasets: [{
+          label: 'Count',
+          data: bins,
+          backgroundColor: '#36A2EB'
+        }]
+      },
+      options: {
+        responsive: false,
+        plugins: {
+          title: {
+            display: true,
+            text: 'Price Distribution',
+            font: { size: 20 }
+          },
+          legend: { display: false }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { font: { size: 12 } }
+          },
+          x: {
+            ticks: {
+              font: { size: 10 },
+              maxRotation: 45,
+              minRotation: 45
+            }
+          }
+        }
+      }
+    };
+
+    // Generate chart images
+    const pieChartImage = await chartJSNodeCanvas.renderToBuffer(pieChartConfig);
+    const histogramImage = await chartJSNodeCanvas.renderToBuffer(histogramConfig);
+
+    // Create main canvas
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    // White background
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, width, height);
+
+    // Load and draw charts
+    const Image = require('canvas').Image;
+
+    const pieImg = new Image();
+    pieImg.src = pieChartImage;
+    ctx.drawImage(pieImg, 50, 50, chartWidth, chartHeight);
+
+    const histImg = new Image();
+    histImg.src = histogramImage;
+    ctx.drawImage(histImg, 600, 50, chartWidth, chartHeight);
+
+    // Draw table
+    const tableY = 500;
+    const tableX = 50;
+    const rowHeight = 25;
+    const colWidths = [300, 100, 80, 80, 150, 100];
+    const headers = ['ITEM', 'SKU', 'PACK', 'SIZE', 'BRAND', 'PRICE'];
+
+    // Table title
+    ctx.fillStyle = '#333';
+    ctx.font = 'bold 18px Arial';
+    ctx.fillText('Product Details', tableX, tableY - 20);
+
+    // Table header
+    ctx.fillStyle = '#667eea';
+    ctx.fillRect(tableX, tableY, colWidths.reduce((a, b) => a + b, 0), rowHeight);
+
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 14px Arial';
+    let xPos = tableX + 5;
+    headers.forEach((header, i) => {
+      ctx.fillText(header, xPos, tableY + 17);
+      xPos += colWidths[i];
+    });
+
+    // Table rows (show max 30 rows)
+    ctx.font = '12px Arial';
+    const maxRows = Math.min(data.length, 30);
+
+    for (let i = 0; i < maxRows; i++) {
+      const item = data[i];
+      const y = tableY + (i + 1) * rowHeight;
+
+      // Alternating row colors
+      ctx.fillStyle = i % 2 === 0 ? '#f8f9fa' : 'white';
+      ctx.fillRect(tableX, y, colWidths.reduce((a, b) => a + b, 0), rowHeight);
+
+      // Row data
+      ctx.fillStyle = '#333';
+      xPos = tableX + 5;
+      const rowData = [
+        item.ITEM?.substring(0, 35) || '',
+        item.SKU || '',
+        item.PACK || '',
+        item.SIZE || '',
+        item.BRAND || '',
+        `$${item.PRICE || '0'}`
+      ];
+
+      rowData.forEach((text, j) => {
+        ctx.fillText(text, xPos, y + 17);
+        xPos += colWidths[j];
+      });
+    }
+
+    // Add note if more records exist
+    if (data.length > maxRows) {
+      ctx.fillStyle = '#666';
+      ctx.font = 'italic 12px Arial';
+      ctx.fillText(
+        `... and ${data.length - maxRows} more records`,
+        tableX,
+        tableY + (maxRows + 1) * rowHeight + 10
+      );
+    }
+
+    // Convert canvas to PNG buffer
+    const buffer = canvas.toBuffer('image/png');
+
+    // Send PNG as response
+    res.set('Content-Type', 'image/png');
+    res.set('Content-Disposition', 'attachment; filename="product-visualization.png"');
+    res.send(buffer);
+
+  } catch (error) {
+    console.error('Visualization error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate visualization: ' + error.message
+    });
+  }
 });
 
 // POST create new item
