@@ -60,7 +60,7 @@ The entire application lives in a single `server.js` file. There are no separate
 ### Authentication
 - **JWT-based authentication**: All API endpoints (except login) require a valid JWT token
 - **Password hashing**: Uses bcrypt with salt rounds of 10
-- **Token expiration**: Tokens expire after 24 hours
+- **Token expiration**: Tokens expire after 7 days
 - **Authentication middleware**: `authenticateToken` function validates JWT on protected routes
 
 ### Data Storage
@@ -112,7 +112,7 @@ The entire application lives in a single `server.js` file. There are no separate
 
 ### Authentication Flow
 1. **Login**: POST to `/api/login` with `{"username": "admin", "password": "password123"}`
-2. **Receive Token**: Response contains JWT token with 24-hour expiration
+2. **Receive Token**: Response contains JWT token with 7-day expiration
 3. **Use Token**: Include in Authorization header: `Authorization: Bearer <token>`
 4. **Access Protected Routes**: All other endpoints require this header
 
@@ -150,7 +150,7 @@ curl -X POST https://sales-coach-api-xtzh.onrender.com/api/login \
   "success": true,
   "message": "Login successful",
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "expiresIn": "24h"
+  "expiresIn": "7d"
 }
 ```
 
@@ -379,7 +379,7 @@ curl https://sales-coach-api-xtzh.onrender.com/api/items \
 ### Integration with Chatbot
 
 For chatbot integration:
-1. **Authenticate**: Call `/api/login` to get a token (store it for 24 hours)
+1. **Authenticate**: Call `/api/login` to get a token (store it for 7 days)
 2. **Query Products**:
    - **Recommended**: Use `POST /api/items/filter` with body parameters for flexible, combined filtering
    - Alternative: Use `/api/items/search?q=QUERY` to search all fields
@@ -585,7 +585,7 @@ Full-text search checks all object values with case-insensitive substring matchi
 - Single user authentication (no user management system)
 - No rate limiting
 - CORS allows all origins
-- No refresh token mechanism (tokens expire after 24h)
+- No refresh token mechanism (tokens expire after 7 days)
 
 ### Deployment on Render
 Required environment variables:
