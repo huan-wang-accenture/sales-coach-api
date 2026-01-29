@@ -97,7 +97,9 @@ The entire application lives in a single `server.js` file. There are no separate
 | GET | `/api/items/category/:category` | Filter by category (case-insensitive) | Yes |
 | GET | `/api/items/search?q=query` | Full-text search across all fields | Yes |
 | POST | `/api/items/filter` | **Filter with body params** (item, brand, category, minPrice, maxPrice) - case-insensitive contains | Yes |
-| POST | `/api/items/visualize` | **Generate PNG visualization** (pie chart, histogram, table) from items data | Yes |
+| POST | `/api/items/visualize` | **Generate PNG visualization** (pie chart, histogram, table) from items data - supports EDN and JSON formats | Yes |
+| GET | `/api/test-canvas` | **Test canvas dependencies** - diagnostic endpoint to verify visualization libraries are working | Yes |
+| DELETE | `/api/visualizations/cleanup` | **Clean up old visualization files** - remove PNG files older than specified age (default: 1 hour) | Yes |
 | POST | `/api/items` | Create new product (requires: SKU, ITEM, CATEGORY, PRICE) | Yes |
 | PUT | `/api/items/:id` | Update product (supports partial updates) | Yes |
 | DELETE | `/api/items/:id` | Delete product | Yes |
@@ -371,6 +373,10 @@ The `/api/items/visualize` endpoint generates a PNG image with visualizations of
 - **Table**: Detailed product information (ITEM, SKU, PACK, SIZE, BRAND, PRICE) - shows up to 30 records
 
 **Input Format:**
+
+Accepts both JSON array and EDN (Extensible Data Notation) string formats:
+
+**JSON format:**
 ```json
 {
   "data": [
@@ -383,15 +389,39 @@ The `/api/items/visualize` endpoint generates a PNG image with visualizations of
       "ITEM": "BUTTERMILK BISCUIT MIX",
       "CATEGORY": "Cat 6 Mix Cookie-Biscuit-Pancake-Churro",
       "PRICE": "212"
-    },
-    ...more items...
+    }
   ]
 }
 ```
 
-**Output:** PNG image (1200x1600 pixels, ~250KB)
+**EDN format (from Juji):**
+```json
+{
+  "data": "[{\"id\" 126, \"SKU\" \"74763\", \"PACK\" \"BAG\", ...}]"
+}
+```
 
-#### Usage Example 1: Visualize Filtered Data
+The endpoint automatically detects and converts EDN format to JSON.
+
+**Output Formats:**
+
+1. **JSON with public URL** (for Juji chatbot) - Add `Accept: application/json` header or `?format=json`:
+```json
+{
+  "success": true,
+  "message": "Generated visualization for 13 items",
+  "imageUrl": "https://sales-coach-api-xtzh.onrender.com/visualizations/visualization-1738180000000.png",
+  "image": "https://sales-coach-api-xtzh.onrender.com/visualizations/visualization-1738180000000.png",
+  "filename": "visualization-1738180000000.png",
+  "format": "png",
+  "items": 13,
+  "expiresIn": "1 hour"
+}
+```
+
+2. **Binary PNG** (for direct download) - Default response format
+
+#### Usage Example 1: Visualize Filtered Data (Binary PNG)
 
 **Step 1: Filter items**
 ```bash
@@ -419,6 +449,30 @@ curl -X POST https://sales-coach-api-xtzh.onrender.com/api/items/visualize \
 open product-visualization.png  # Mac
 xdg-open product-visualization.png  # Linux
 start product-visualization.png  # Windows
+```
+
+#### Usage Example 1b: Get Public URL (for Juji Integration)
+
+```bash
+# Filter and get public URL
+curl -s -X POST https://sales-coach-api-xtzh.onrender.com/api/items/filter \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"category": "chocolate"}' | \
+curl -X POST "https://sales-coach-api-xtzh.onrender.com/api/items/visualize?format=json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d @-
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "imageUrl": "https://sales-coach-api-xtzh.onrender.com/visualizations/visualization-1738180000000.png",
+  "items": 13,
+  "expiresIn": "1 hour"
+}
 ```
 
 #### Usage Example 2: One-Line Command
@@ -467,14 +521,43 @@ curl -X POST https://sales-coach-api-xtzh.onrender.com/api/items/visualize \
 | **Colors** | 10 distinct colors for pie chart |
 | **Background** | White |
 
+#### File Storage and Cleanup
+
+**Automatic Cleanup:**
+- Generated PNG files are stored in `public/visualizations/` directory
+- Files older than **1 hour** are automatically deleted when new visualizations are generated
+- Cleanup is non-blocking and logged to console
+- On Render's free tier, files are also cleared on server restart
+
+**Manual Cleanup:**
+```bash
+# Delete files older than 1 hour (default)
+curl -X DELETE https://sales-coach-api-xtzh.onrender.com/api/visualizations/cleanup \
+  -H "Authorization: Bearer $TOKEN"
+
+# Delete files older than 30 minutes
+curl -X DELETE "https://sales-coach-api-xtzh.onrender.com/api/visualizations/cleanup?maxAge=1800000" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Delete ALL visualization files
+curl -X DELETE "https://sales-coach-api-xtzh.onrender.com/api/visualizations/cleanup?maxAge=0" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Query Parameters:**
+- `maxAge`: Maximum age in milliseconds (default: 3600000 = 1 hour)
+
 #### Notes
 
 - The endpoint accepts the same data format returned by `/api/items` and `/api/items/filter`
+- **Supports EDN format from Juji** - automatically converts EDN strings to JSON
 - Brand pie chart shows top 10 brands by count
 - Price histogram automatically calculates optimal bins
 - Table shows first 30 products (indicates if more exist)
 - PNG is optimized for both screen display and printing
 - Authentication required (JWT token)
+- **Two response formats**: Binary PNG (default) or JSON with public URL (`?format=json` or `Accept: application/json`)
+- Public URLs expire after 1 hour (automatic cleanup)
 
 ### Automated Token Management (Bash Script)
 
@@ -499,14 +582,37 @@ For chatbot integration:
 2. **Query Products**:
    - **Recommended**: Use `POST /api/items/filter` with body parameters for flexible, combined filtering
    - Alternative: Use `/api/items/search?q=QUERY` to search all fields
-3. **Get Details**: Use `/api/items/:id` or `/api/items/sku/:sku` for specific items
-4. **Real-time Sync**: Any changes made in the web UI are immediately reflected in API responses
+3. **Visualize Results**: Use `POST /api/items/visualize?format=json` to generate charts
+4. **Get Details**: Use `/api/items/:id` or `/api/items/sku/:sku` for specific items
+5. **Real-time Sync**: Any changes made in the web UI are immediately reflected in API responses
 
 **Why use POST /api/items/filter for chatbots:**
 - Accepts parameters in request body (works with tools that only support one endpoint)
 - Combine multiple criteria in one request (item, brand, category, price range)
 - Case-insensitive partial matching (user-friendly)
 - Returns exactly what user asks for (precise results)
+
+**Juji Integration for Visualizations:**
+
+The visualization endpoint has been optimized for Juji integration:
+
+1. **EDN Format Support**: Juji sends data in EDN format, which the endpoint automatically converts to JSON
+2. **Public URL Response**: Add `?format=json` or `Accept: application/json` header to get a public URL instead of binary PNG
+3. **Response Mapping** in Juji:
+   - Path: `["imageUrl"]`
+   - Attribute: Store as variable (e.g., `plotUrl`)
+4. **Display in Chat**: Use the URL in Juji's message template or provide as a clickable link
+5. **Auto-Cleanup**: Files expire after 1 hour, no manual cleanup needed
+
+**Example Juji Workflow:**
+```
+1. Call /api/items/filter → Store response in variable "filteredData"
+2. Call /api/items/visualize?format=json with body: {"data": "{{filteredData}}"}
+3. Extract imageUrl from response → Store as "plotUrl"
+4. Display link to user: "Here's your visualization: {{plotUrl}}"
+```
+
+See `VISUALIZATION_ENDPOINT.md` for detailed troubleshooting and configuration guide.
 
 ### Example Product Data
 
@@ -702,6 +808,7 @@ Full-text search checks all object values with case-insensitive substring matchi
 - No rate limiting
 - CORS allows all origins
 - No refresh token mechanism (tokens expire after 7 days)
+- Visualization files are ephemeral (deleted after 1 hour or on server restart)
 
 ### Deployment on Render
 Required environment variables:
