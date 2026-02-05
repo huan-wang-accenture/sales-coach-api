@@ -35,6 +35,8 @@ Environment variables:
 - `JWT_SECRET`: Secret key for signing JWT tokens
 - `ADMIN_USERNAME`: Admin username (default: admin)
 - `ADMIN_PASSWORD_HASH`: Bcrypt hash of admin password
+- `USE_EXCEL_DATA`: Enable Excel-based storage (true/false, default: false)
+- `EXCEL_FILE_PATH`: Path to Excel file (default: data/products.xlsx)
 - `JUJI_API_URL`: Juji chat URL base (e.g., https://juji.ai/pre-chat or https://juji.ai/chat)
 - `JUJI_ENGAGEMENT_ID`: Your Juji engagement ID (required for chatbot)
 - `JUJI_API_KEY`: Your Juji API key (required for chatbot - currently unused but kept for future use)
@@ -64,9 +66,13 @@ The entire application lives in a single `server.js` file. There are no separate
 - **Authentication middleware**: `authenticateToken` function validates JWT on protected routes
 
 ### Data Storage
-- **In-memory storage**: All 199 products stored in a hardcoded JavaScript array (lines 11-211 in server.js)
-- **Data persistence**: None - data resets on server restart
+- **Excel-based storage (optional)**: When `USE_EXCEL_DATA=true`, products are loaded from `/data/products.xlsx` at startup
+  - All write operations (POST/PUT/DELETE) automatically persist changes to Excel
+  - Changes persist across server restarts
+  - Manual reload endpoint: `GET /api/items/reload`
+- **Fallback to hardcoded data**: If Excel file missing or `USE_EXCEL_DATA=false`, uses 199 hardcoded products
 - **Data structure**: Each item contains: `id`, `SKU`, `PACK`, `SIZE`, `BRAND`, `ITEM`, `CATEGORY`, `PRICE`
+- **Production note**: On Render free tier, filesystem is ephemeral (resets on deployment)
 
 ### API Design Pattern
 - RESTful endpoints under `/api` prefix
@@ -96,6 +102,7 @@ The entire application lives in a single `server.js` file. There are no separate
 | GET | `/api/items/sku/:sku` | Get product by SKU code | Yes |
 | GET | `/api/items/category/:category` | Filter by category (case-insensitive) | Yes |
 | GET | `/api/items/search?q=query` | Full-text search across all fields | Yes |
+| GET | `/api/items/reload` | **Reload data from Excel** - manually refresh items from Excel file without restart (only when USE_EXCEL_DATA=true) | Yes |
 | POST | `/api/items/filter` | **Filter with body params** (item, brand, category, minPrice, maxPrice) - case-insensitive contains | Yes |
 | POST | `/api/items/visualize` | **Generate PNG visualization** (pie chart, histogram, table) from items data - supports EDN and JSON formats | Yes |
 | GET | `/api/test-canvas` | **Test canvas dependencies** - diagnostic endpoint to verify visualization libraries are working | Yes |
@@ -803,7 +810,7 @@ Full-text search checks all object values with case-insensitive substring matchi
 - ⚠️ **Environment Variables**: Never commit `.env` file; configure in deployment platform (Render, etc.)
 
 ### Limitations
-- No database integration (data is lost on restart)
+- Excel-based persistence available but limited on Render free tier (ephemeral filesystem)
 - Single user authentication (no user management system)
 - No rate limiting
 - CORS allows all origins
@@ -816,6 +823,8 @@ Required environment variables:
 JWT_SECRET=<long-random-string>
 ADMIN_USERNAME=<your-username>
 ADMIN_PASSWORD_HASH=<bcrypt-hash-of-password>
+USE_EXCEL_DATA=true
+EXCEL_FILE_PATH=data/products.xlsx
 ```
 
 Generate new password hash for production:
