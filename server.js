@@ -8,12 +8,17 @@ const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 const { createCanvas } = require('canvas');
 const fs = require('fs');
 const path = require('path');
+const XLSX = require('xlsx');
 const app = express();
 
 // Configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || '$2b$10$rKqwBxZlLZJlGQ0p3mXDQOxCZqJxVZ5xHKQ5fKYZQqYZqYZqYZqYZ'; // Default: 'password123'
+
+// Excel Configuration
+const USE_EXCEL_DATA = process.env.USE_EXCEL_DATA === 'true';
+const EXCEL_FILE_PATH = process.env.EXCEL_FILE_PATH || 'data/products.xlsx';
 
 // Middleware
 app.use(cors()); // Enable CORS for all origins
@@ -100,8 +105,102 @@ async function callJujiAPI(query, variables = {}) {
 // END JUJI INTEGRATION HELPERS
 // ============================================================
 
+// ============================================================
+// EXCEL INTEGRATION FUNCTIONS
+// ============================================================
+
+/**
+ * Load items from Excel file
+ * @returns {Array|null} Array of items or null if load fails
+ */
+function loadItemsFromExcel() {
+  try {
+    const filePath = path.resolve(EXCEL_FILE_PATH);
+
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      console.warn(`⚠️  Excel file not found at: ${filePath}`);
+      return null;
+    }
+
+    // Read Excel file
+    const workbook = XLSX.readFile(filePath);
+
+    // Get first sheet (Products)
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+
+    // Convert to JSON
+    const data = XLSX.utils.sheet_to_json(worksheet);
+
+    // Validate data structure
+    if (!Array.isArray(data) || data.length === 0) {
+      console.warn('⚠️  Excel file is empty or invalid format');
+      return null;
+    }
+
+    // Validate required fields
+    const requiredFields = ['id', 'SKU', 'ITEM', 'CATEGORY', 'PRICE'];
+    const firstItem = data[0];
+    const missingFields = requiredFields.filter(field => !(field in firstItem));
+
+    if (missingFields.length > 0) {
+      console.warn(`⚠️  Excel file missing required fields: ${missingFields.join(', ')}`);
+      return null;
+    }
+
+    console.log(`✅ Loaded ${data.length} items from Excel: ${filePath}`);
+    return data;
+
+  } catch (error) {
+    console.error('❌ Error loading Excel file:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Save items to Excel file
+ * @param {Array} items - Array of items to save
+ * @returns {boolean} True if save successful, false otherwise
+ */
+function saveItemsToExcel(items) {
+  try {
+    const filePath = path.resolve(EXCEL_FILE_PATH);
+
+    // Ensure data directory exists
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+
+    // Convert JSON to worksheet
+    const ws = XLSX.utils.json_to_sheet(items);
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, 'Products');
+
+    // Write to file
+    XLSX.writeFile(wb, filePath);
+
+    console.log(`✅ Saved ${items.length} items to Excel: ${filePath}`);
+    return true;
+
+  } catch (error) {
+    console.warn('⚠️  Error saving Excel file (changes in memory only):', error.message);
+    return false;
+  }
+}
+
+// ============================================================
+// END EXCEL INTEGRATION FUNCTIONS
+// ============================================================
+
 // Initial data (your sales coach items)
-let items = [
+// Hardcoded fallback data
+const FALLBACK_ITEMS = [
   { id: 0, SKU: "10050", PACK: "BAG", SIZE: "50#", BRAND: "WESTCO", ITEM: "BUTTERMILK BISCUIT MIX", CATEGORY: "Cat 6 Mix Cookie-Biscuit-Pancake-Churro", PRICE: "212" },
   { id: 1, SKU: "10058", PACK: "BAG", SIZE: "50#", BRAND: "WESTCO", ITEM: "BISCUIT AND SCONE MIX S/O ", CATEGORY: "Cat 6 Mix Cookie-Biscuit-Pancake-Churro", PRICE: "203" },
   { id: 2, SKU: "10065", PACK: "BAG", SIZE: "30#", BRAND: "WESTCO", ITEM: "SCRUMPTIOUS SCONE MIX", CATEGORY: "Cat 6 Mix Cookie-Biscuit-Pancake-Churro", PRICE: "290" },
@@ -303,6 +402,24 @@ let items = [
   { id: 198, SKU: "74746", PACK: "CSE", SIZE: "6/2.2#", BRAND: "CACAOB", ITEM: "COCOA EXTRA BRUTE, DUTCHED 22-24%", CATEGORY: "Cat 48 Cocoa-Cocoa Butter", PRICE: "22" }
 ];
 
+// Initialize items array based on configuration
+let items;
+
+if (USE_EXCEL_DATA) {
+  console.log('📊 Excel data mode enabled - attempting to load from Excel...');
+  items = loadItemsFromExcel();
+
+  if (!items) {
+    console.warn('⚠️  Failed to load from Excel - falling back to hardcoded data');
+    items = [...FALLBACK_ITEMS];
+  }
+} else {
+  console.log('💾 Using hardcoded data (USE_EXCEL_DATA=false)');
+  items = [...FALLBACK_ITEMS];
+}
+
+console.log(`✅ Initialized with ${items.length} items`);
+
 // API Info endpoint
 app.get('/api', (req, res) => {
   res.json({
@@ -488,6 +605,35 @@ app.get('/api/categories', authenticateToken, (req, res) => {
     success: true,
     count: categories.length,
     data: categories
+  });
+});
+
+// GET reload items from Excel (must be before /:id route)
+app.get('/api/items/reload', authenticateToken, (req, res) => {
+  if (!USE_EXCEL_DATA) {
+    return res.status(400).json({
+      success: false,
+      error: 'Excel data mode is disabled (USE_EXCEL_DATA=false)'
+    });
+  }
+
+  const reloadedItems = loadItemsFromExcel();
+
+  if (!reloadedItems) {
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to reload items from Excel file'
+    });
+  }
+
+  // Replace items array with reloaded data
+  items.length = 0;
+  items.push(...reloadedItems);
+
+  res.json({
+    success: true,
+    message: 'Items reloaded from Excel successfully',
+    count: items.length
   });
 });
 
@@ -984,6 +1130,11 @@ app.post('/api/items', authenticateToken, (req, res) => {
 
   items.push(newItem);
 
+  // Persist to Excel if enabled
+  if (USE_EXCEL_DATA) {
+    saveItemsToExcel(items);
+  }
+
   res.status(201).json({
     success: true,
     message: 'Item created successfully',
@@ -1015,6 +1166,11 @@ app.put('/api/items/:id', authenticateToken, (req, res) => {
     PRICE: PRICE !== undefined ? PRICE : items[index].PRICE
   };
 
+  // Persist to Excel if enabled
+  if (USE_EXCEL_DATA) {
+    saveItemsToExcel(items);
+  }
+
   res.json({
     success: true,
     message: 'Item updated successfully',
@@ -1034,6 +1190,11 @@ app.delete('/api/items/:id', authenticateToken, (req, res) => {
   }
 
   const deletedItem = items.splice(index, 1)[0];
+
+  // Persist to Excel if enabled
+  if (USE_EXCEL_DATA) {
+    saveItemsToExcel(items);
+  }
 
   res.json({
     success: true,
