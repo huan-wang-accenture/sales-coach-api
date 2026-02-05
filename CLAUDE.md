@@ -4,7 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Sales Coach API - A Node.js/Express REST API for managing bakery/confectionery product inventory with 199 products across 8 categories. Features JWT-based authentication for secure access.
+Sales Coach API - A Node.js/Express REST API for managing bakery/confectionery product inventory across 8 categories. Features JWT-based authentication and Excel-based data persistence.
+
+**Data Storage:**
+- Primary: 221 products in `/data/products.xlsx` (when `USE_EXCEL_DATA=true`)
+- Fallback: 199 hardcoded products in `server.js` (when Excel disabled or file missing)
+- All write operations (POST/PUT/DELETE) automatically persist to Excel
 
 ## Development Commands
 
@@ -57,7 +62,12 @@ To obtain your Juji API key:
 ## Architecture
 
 ### Monolithic Structure
-The entire application lives in a single `server.js` file. There are no separate route handlers, controllers, models, or middleware directories.
+The entire application logic lives in a single `server.js` file. There are no separate route handlers, controllers, models, or middleware directories.
+
+**File Structure:**
+- `server.js` - All application code (routes, middleware, logic)
+- `data/products.xlsx` - Product data storage (when Excel mode enabled)
+- `public/` - Static files (HTML, CSS, JS for web UI)
 
 ### Authentication
 - **JWT-based authentication**: All API endpoints (except login) require a valid JWT token
@@ -81,13 +91,23 @@ The entire application lives in a single `server.js` file. There are no separate
 - Express middleware stack: CORS → JSON parsing → URL-encoded form parsing → Authentication (on protected routes)
 
 ### Route Organization in server.js
-- Lines 1-35: Dependencies and authentication middleware setup
+**Top Section:**
+- Dependencies (Express, CORS, JWT, bcrypt, xlsx, canvas)
+- Configuration (JWT secret, admin credentials, Excel settings)
+- Middleware setup (CORS, JSON parsing, authentication)
+
+**Excel Integration:**
+- `loadItemsFromExcel()` - Reads products from Excel file
+- `saveItemsToExcel()` - Persists changes to Excel file
+- Items array initialization with Excel/fallback logic
+
+**API Routes:**
 - Root endpoint: API documentation
-- POST /api/login: Authentication endpoint (no token required)
-- GET routes: items, categories, search, by ID/SKU/category (all require authentication)
-- POST route: Create item (requires authentication)
-- PUT route: Update item (requires authentication)
-- DELETE route: Delete item (requires authentication)
+- POST `/api/login` - Authentication (no token required)
+- GET `/api/items/reload` - Reload from Excel (requires auth)
+- GET routes - items, categories, search, by ID/SKU/category (requires auth)
+- POST/PUT/DELETE routes - CRUD operations with Excel persistence (requires auth)
+- Chatbot endpoints - Juji integration (requires auth)
 - Error handlers: 404 and 500
 - Server initialization
 
@@ -96,7 +116,7 @@ The entire application lives in a single `server.js` file. There are no separate
 | Method | Endpoint | Purpose | Auth Required |
 |--------|----------|---------|---------------|
 | POST | `/api/login` | Get JWT access token | No |
-| GET | `/api/items` | Retrieve all 199 products | Yes |
+| GET | `/api/items` | Retrieve all products (221 from Excel, or 199 fallback) | Yes |
 | GET | `/api/categories` | Get 8 unique categories | Yes |
 | GET | `/api/items/:id` | Get product by numeric ID | Yes |
 | GET | `/api/items/sku/:sku` | Get product by SKU code | Yes |
