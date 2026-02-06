@@ -554,7 +554,7 @@ app.delete('/api/visualizations/cleanup', authenticateToken, (req, res) => {
       });
     }
 
-    const maxAge = parseInt(req.query.maxAge) || 60 * 60 * 1000; // Default: 1 hour
+    const maxAge = parseInt(req.query.maxAge) || 48 * 60 * 60 * 1000; // Default: 48 hours
     const now = Date.now();
     const files = fs.readdirSync(visualizationsDir);
     let deletedCount = 0;
@@ -1036,8 +1036,8 @@ app.post('/api/items/visualize', authenticateToken, async (req, res) => {
         fs.mkdirSync(visualizationsDir, { recursive: true });
       }
 
-      // Cleanup old files (older than 1 hour)
-      const ONE_HOUR = 60 * 60 * 1000; // 1 hour in milliseconds
+      // Cleanup old files (older than 48 hours)
+      const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000; // 48 hours in milliseconds
       const now = Date.now();
 
       try {
@@ -1050,7 +1050,7 @@ app.post('/api/items/visualize', authenticateToken, async (req, res) => {
             const stats = fs.statSync(filePath);
             const fileAge = now - stats.mtimeMs;
 
-            if (fileAge > ONE_HOUR) {
+            if (fileAge > FORTY_EIGHT_HOURS) {
               fs.unlinkSync(filePath);
               deletedCount++;
             }
@@ -1087,7 +1087,7 @@ app.post('/api/items/visualize', authenticateToken, async (req, res) => {
         filename: filename,
         format: 'png',
         items: data.length,
-        expiresIn: '1 hour'
+        expiresIn: '48 hours'
       });
     } else {
       // Return raw PNG binary (for direct download)
