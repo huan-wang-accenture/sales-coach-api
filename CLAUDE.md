@@ -126,7 +126,7 @@ The entire application logic lives in a single `server.js` file. There are no se
 | POST | `/api/items/filter` | **Filter with body params** (item, brand, category, minPrice, maxPrice) - case-insensitive contains | Yes |
 | POST | `/api/items/visualize` | **Generate PNG visualization** (pie chart, histogram, table) from items data - supports EDN and JSON formats | Yes |
 | GET | `/api/test-canvas` | **Test canvas dependencies** - diagnostic endpoint to verify visualization libraries are working | Yes |
-| DELETE | `/api/visualizations/cleanup` | **Clean up old visualization files** - remove PNG files older than specified age (default: 48 hours) | Yes |
+| DELETE | `/api/visualizations/cleanup` | **Clean up old visualization files** - remove PNG files older than specified age (default: 30 days) | Yes |
 | POST | `/api/items` | Create new product (requires: SKU, ITEM, CATEGORY, PRICE) | Yes |
 | PUT | `/api/items/:id` | Update product (supports partial updates) | Yes |
 | DELETE | `/api/items/:id` | Delete product | Yes |
@@ -442,7 +442,7 @@ The endpoint automatically detects and converts EDN format to JSON.
   "filename": "visualization-1738180000000.png",
   "format": "png",
   "items": 13,
-  "expiresIn": "48 hours"
+  "expiresIn": "30 days"
 }
 ```
 
@@ -498,7 +498,7 @@ curl -X POST "https://sales-coach-api-xtzh.onrender.com/api/items/visualize?form
   "success": true,
   "imageUrl": "https://sales-coach-api-xtzh.onrender.com/visualizations/visualization-1738180000000.png",
   "items": 13,
-  "expiresIn": "48 hours"
+  "expiresIn": "30 days"
 }
 ```
 
@@ -552,13 +552,13 @@ curl -X POST https://sales-coach-api-xtzh.onrender.com/api/items/visualize \
 
 **Automatic Cleanup:**
 - Generated PNG files are stored in `public/visualizations/` directory
-- Files older than **48 hours** are automatically deleted when new visualizations are generated
+- Files older than **30 days** are automatically deleted when new visualizations are generated
 - Cleanup is non-blocking and logged to console
 - On Render's free tier, files are also cleared on server restart
 
 **Manual Cleanup:**
 ```bash
-# Delete files older than 48 hours (default)
+# Delete files older than 30 days (default)
 curl -X DELETE https://sales-coach-api-xtzh.onrender.com/api/visualizations/cleanup \
   -H "Authorization: Bearer $TOKEN"
 
@@ -572,7 +572,7 @@ curl -X DELETE "https://sales-coach-api-xtzh.onrender.com/api/visualizations/cle
 ```
 
 **Query Parameters:**
-- `maxAge`: Maximum age in milliseconds (default: 172800000 = 48 hours)
+- `maxAge`: Maximum age in milliseconds (default: 2592000000 = 30 days)
 
 #### Notes
 
@@ -584,7 +584,7 @@ curl -X DELETE "https://sales-coach-api-xtzh.onrender.com/api/visualizations/cle
 - PNG is optimized for both screen display and printing
 - Authentication required (JWT token)
 - **Two response formats**: Binary PNG (default) or JSON with public URL (`?format=json` or `Accept: application/json`)
-- Public URLs expire after 48 hours (automatic cleanup)
+- Public URLs expire after 30 days (automatic cleanup)
 
 ### Automated Token Management (Bash Script)
 
@@ -629,7 +629,7 @@ The visualization endpoint has been optimized for Juji integration:
    - Path: `["imageUrl"]`
    - Attribute: Store as variable (e.g., `plotUrl`)
 4. **Display in Chat**: Use the URL in Juji's message template or provide as a clickable link
-5. **Auto-Cleanup**: Files expire after 48 hours, no manual cleanup needed
+5. **Auto-Cleanup**: Files expire after 30 days, no manual cleanup needed
 
 **Example Juji Workflow:**
 ```
@@ -835,7 +835,7 @@ Full-text search checks all object values with case-insensitive substring matchi
 - No rate limiting
 - CORS allows all origins
 - No refresh token mechanism (tokens expire after 7 days)
-- Visualization files are ephemeral (deleted after 48 hours or on server restart)
+- Visualization files are ephemeral (deleted after 30 days or on server restart)
 
 ### Deployment on Render
 Required environment variables:
