@@ -206,6 +206,67 @@ function saveItemsToExcel(items) {
 // END EXCEL INTEGRATION FUNCTIONS
 // ============================================================
 
+// ============================================================
+// CLOUDINARY CLEANUP FUNCTIONS
+// ============================================================
+
+/**
+ * Automatically cleanup old visualizations from Cloudinary
+ * @param {number} maxAge - Maximum age in milliseconds (default: 48 hours)
+ */
+async function autoCleanupCloudinary(maxAge = 48 * 60 * 60 * 1000) {
+  try {
+    console.log(`🧹 Auto-cleanup: checking Cloudinary for images older than ${Math.round(maxAge / 3600000)} hours`);
+
+    const listResult = await cloudinary.api.resources({
+      type: 'upload',
+      prefix: 'sales-coach-visualizations/',
+      max_results: 500
+    });
+
+    const now = Date.now();
+    const toDelete = [];
+
+    for (const resource of listResult.resources) {
+      const match = resource.public_id.match(/visualization-(\d+)/);
+      if (match) {
+        const timestamp = parseInt(match[1]);
+        const fileAge = now - timestamp;
+
+        if (fileAge > maxAge) {
+          toDelete.push(resource.public_id);
+        }
+      }
+    }
+
+    if (toDelete.length > 0) {
+      await cloudinary.api.delete_resources(toDelete);
+      console.log(`✅ Auto-cleanup: deleted ${toDelete.length} old image(s)`);
+      return toDelete.length;
+    } else {
+      console.log('ℹ️  Auto-cleanup: no old images to delete');
+      return 0;
+    }
+  } catch (error) {
+    console.error('⚠️  Auto-cleanup error (non-fatal):', error.message);
+    return 0;
+  }
+}
+
+// Schedule automatic cleanup every 24 hours
+setInterval(() => {
+  autoCleanupCloudinary(48 * 60 * 60 * 1000); // Delete images older than 48 hours
+}, 24 * 60 * 60 * 1000); // Run every 24 hours
+
+// Run cleanup on server startup (after 1 minute delay to not slow down startup)
+setTimeout(() => {
+  autoCleanupCloudinary(48 * 60 * 60 * 1000);
+}, 60 * 1000);
+
+// ============================================================
+// END CLOUDINARY CLEANUP FUNCTIONS
+// ============================================================
+
 // Initial data (your sales coach items)
 // Hardcoded fallback data
 const FALLBACK_ITEMS = [
@@ -549,47 +610,66 @@ app.get('/api/test-canvas', authenticateToken, async (req, res) => {
   }
 });
 
-// Cleanup old visualization files endpoint
-app.delete('/api/visualizations/cleanup', authenticateToken, (req, res) => {
+// Cleanup old visualization files endpoint (Cloudinary version)
+app.delete('/api/visualizations/cleanup', authenticateToken, async (req, res) => {
   try {
-    const visualizationsDir = path.join(__dirname, 'public', 'visualizations');
-
-    if (!fs.existsSync(visualizationsDir)) {
-      return res.json({
-        success: true,
-        message: 'Visualizations directory does not exist',
-        deletedCount: 0
-      });
-    }
-
     const maxAge = parseInt(req.query.maxAge) || 48 * 60 * 60 * 1000; // Default: 48 hours
     const now = Date.now();
-    const files = fs.readdirSync(visualizationsDir);
+
+    console.log(`🧹 Starting Cloudinary cleanup: deleting images older than ${Math.round(maxAge / 3600000)} hours`);
+
+    // List all images in the sales-coach-visualizations folder
+    const listResult = await cloudinary.api.resources({
+      type: 'upload',
+      prefix: 'sales-coach-visualizations/',
+      max_results: 500  // Adjust if you have more images
+    });
+
     let deletedCount = 0;
     const deletedFiles = [];
+    const toDelete = [];
 
-    files.forEach(file => {
-      if (file.startsWith('visualization-') && file.endsWith('.png')) {
-        const filePath = path.join(visualizationsDir, file);
-        const stats = fs.statSync(filePath);
-        const fileAge = now - stats.mtimeMs;
+    // Check each image's age
+    for (const resource of listResult.resources) {
+      // Extract timestamp from public_id (format: sales-coach-visualizations/visualization-1770399574281)
+      const match = resource.public_id.match(/visualization-(\d+)/);
+
+      if (match) {
+        const timestamp = parseInt(match[1]);
+        const fileAge = now - timestamp;
 
         if (fileAge > maxAge) {
-          fs.unlinkSync(filePath);
-          deletedCount++;
-          deletedFiles.push({ file, ageMinutes: Math.round(fileAge / 60000) });
+          toDelete.push(resource.public_id);
+          deletedFiles.push({
+            publicId: resource.public_id,
+            url: resource.secure_url,
+            ageHours: Math.round(fileAge / 3600000),
+            createdAt: new Date(timestamp).toISOString()
+          });
         }
       }
-    });
+    }
+
+    // Delete old images from Cloudinary
+    if (toDelete.length > 0) {
+      const deleteResult = await cloudinary.api.delete_resources(toDelete);
+      deletedCount = Object.keys(deleteResult.deleted).length;
+
+      console.log(`✅ Deleted ${deletedCount} image(s) from Cloudinary`);
+    } else {
+      console.log('ℹ️  No images to delete');
+    }
 
     res.json({
       success: true,
-      message: `Cleaned up ${deletedCount} file(s) older than ${Math.round(maxAge / 60000)} minutes`,
+      message: `Cleaned up ${deletedCount} file(s) older than ${Math.round(maxAge / 3600000)} hours`,
       deletedCount,
       deletedFiles,
-      maxAgeMinutes: Math.round(maxAge / 60000)
+      maxAgeHours: Math.round(maxAge / 3600000),
+      totalImages: listResult.resources.length
     });
   } catch (error) {
+    console.error('❌ Cloudinary cleanup error:', error);
     res.status(500).json({
       success: false,
       error: 'Cleanup failed: ' + error.message
