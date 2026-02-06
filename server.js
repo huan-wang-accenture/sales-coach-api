@@ -212,11 +212,12 @@ function saveItemsToExcel(items) {
 
 /**
  * Automatically cleanup old visualizations from Cloudinary
- * @param {number} maxAge - Maximum age in milliseconds (default: 48 hours)
+ * @param {number} maxAge - Maximum age in milliseconds (default: 30 days)
  */
-async function autoCleanupCloudinary(maxAge = 48 * 60 * 60 * 1000) {
+async function autoCleanupCloudinary(maxAge = 30 * 24 * 60 * 60 * 1000) {
   try {
-    console.log(`🧹 Auto-cleanup: checking Cloudinary for images older than ${Math.round(maxAge / 3600000)} hours`);
+    const maxAgeDays = Math.round(maxAge / (24 * 60 * 60 * 1000));
+    console.log(`🧹 Auto-cleanup: checking Cloudinary for images older than ${maxAgeDays} days`);
 
     const listResult = await cloudinary.api.resources({
       type: 'upload',
@@ -255,12 +256,12 @@ async function autoCleanupCloudinary(maxAge = 48 * 60 * 60 * 1000) {
 
 // Schedule automatic cleanup every 24 hours
 setInterval(() => {
-  autoCleanupCloudinary(48 * 60 * 60 * 1000); // Delete images older than 48 hours
+  autoCleanupCloudinary(30 * 24 * 60 * 60 * 1000); // Delete images older than 30 days
 }, 24 * 60 * 60 * 1000); // Run every 24 hours
 
 // Run cleanup on server startup (after 1 minute delay to not slow down startup)
 setTimeout(() => {
-  autoCleanupCloudinary(48 * 60 * 60 * 1000);
+  autoCleanupCloudinary(30 * 24 * 60 * 60 * 1000);
 }, 60 * 1000);
 
 // ============================================================
@@ -613,10 +614,11 @@ app.get('/api/test-canvas', authenticateToken, async (req, res) => {
 // Cleanup old visualization files endpoint (Cloudinary version)
 app.delete('/api/visualizations/cleanup', authenticateToken, async (req, res) => {
   try {
-    const maxAge = parseInt(req.query.maxAge) || 48 * 60 * 60 * 1000; // Default: 48 hours
+    const maxAge = parseInt(req.query.maxAge) || 30 * 24 * 60 * 60 * 1000; // Default: 30 days
     const now = Date.now();
 
-    console.log(`🧹 Starting Cloudinary cleanup: deleting images older than ${Math.round(maxAge / 3600000)} hours`);
+    const maxAgeDays = Math.round(maxAge / (24 * 60 * 60 * 1000));
+    console.log(`🧹 Starting Cloudinary cleanup: deleting images older than ${maxAgeDays} days`);
 
     // List all images in the sales-coach-visualizations folder
     const listResult = await cloudinary.api.resources({
@@ -643,7 +645,7 @@ app.delete('/api/visualizations/cleanup', authenticateToken, async (req, res) =>
           deletedFiles.push({
             publicId: resource.public_id,
             url: resource.secure_url,
-            ageHours: Math.round(fileAge / 3600000),
+            ageDays: Math.round(fileAge / (24 * 60 * 60 * 1000)),
             createdAt: new Date(timestamp).toISOString()
           });
         }
@@ -662,10 +664,10 @@ app.delete('/api/visualizations/cleanup', authenticateToken, async (req, res) =>
 
     res.json({
       success: true,
-      message: `Cleaned up ${deletedCount} file(s) older than ${Math.round(maxAge / 3600000)} hours`,
+      message: `Cleaned up ${deletedCount} file(s) older than ${maxAgeDays} days`,
       deletedCount,
       deletedFiles,
-      maxAgeHours: Math.round(maxAge / 3600000),
+      maxAgeDays: maxAgeDays,
       totalImages: listResult.resources.length
     });
   } catch (error) {
