@@ -9,6 +9,7 @@ const { createCanvas } = require('canvas');
 const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
+const cloudinary = require('cloudinary').v2;
 const app = express();
 
 // Configuration
@@ -19,6 +20,13 @@ const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH || '$2b$10$rKqwBxZlL
 // Excel Configuration
 const USE_EXCEL_DATA = process.env.USE_EXCEL_DATA === 'true';
 const EXCEL_FILE_PATH = process.env.EXCEL_FILE_PATH || 'data/products.xlsx';
+
+// Cloudinary Configuration (for persistent image storage)
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
 // Middleware
 app.use(cors()); // Enable CORS for all origins
@@ -1028,67 +1036,57 @@ app.post('/api/items/visualize', authenticateToken, async (req, res) => {
     const preferJson = acceptHeader.includes('application/json') || req.query.format === 'json';
 
     if (preferJson) {
-      // Save image to public/visualizations directory
-      const visualizationsDir = path.join(__dirname, 'public', 'visualizations');
-
-      // Create directory if it doesn't exist
-      if (!fs.existsSync(visualizationsDir)) {
-        fs.mkdirSync(visualizationsDir, { recursive: true });
-      }
-
-      // Cleanup old files (older than 48 hours)
-      const FORTY_EIGHT_HOURS = 48 * 60 * 60 * 1000; // 48 hours in milliseconds
-      const now = Date.now();
-
+      // Upload to Cloudinary (persistent cloud storage)
       try {
-        const files = fs.readdirSync(visualizationsDir);
-        let deletedCount = 0;
+        // Generate unique public_id with timestamp
+        const timestamp = Date.now();
+        const publicId = `visualization-${timestamp}`;
 
-        files.forEach(file => {
-          if (file.startsWith('visualization-') && file.endsWith('.png')) {
-            const filePath = path.join(visualizationsDir, file);
-            const stats = fs.statSync(filePath);
-            const fileAge = now - stats.mtimeMs;
+        console.log('Uploading visualization to Cloudinary...');
 
-            if (fileAge > FORTY_EIGHT_HOURS) {
-              fs.unlinkSync(filePath);
-              deletedCount++;
-            }
-          }
+        // Convert buffer to base64 data URI for Cloudinary
+        const base64Image = `data:image/png;base64,${buffer.toString('base64')}`;
+
+        // Upload to Cloudinary
+        const uploadResult = await cloudinary.uploader.upload(base64Image, {
+          folder: 'sales-coach-visualizations',
+          public_id: publicId,
+          resource_type: 'image',
+          overwrite: false
         });
 
-        if (deletedCount > 0) {
-          console.log(`Cleaned up ${deletedCount} old visualization file(s)`);
-        }
-      } catch (cleanupError) {
-        console.error('Cleanup error (non-fatal):', cleanupError.message);
+        const imageUrl = uploadResult.secure_url;
+
+        console.log('✅ Uploaded to Cloudinary:', imageUrl);
+        console.log('   - Public ID:', uploadResult.public_id);
+        console.log('   - Size:', Math.round(uploadResult.bytes / 1024), 'KB');
+
+        res.json({
+          success: true,
+          message: `Generated visualization for ${data.length} items`,
+          imageUrl: imageUrl,
+          image: imageUrl,
+          filename: `${publicId}.png`,
+          format: 'png',
+          items: data.length,
+          expiresIn: 'permanent',
+          cloudinary: {
+            publicId: uploadResult.public_id,
+            version: uploadResult.version,
+            width: uploadResult.width,
+            height: uploadResult.height
+          }
+        });
+      } catch (uploadError) {
+        console.error('❌ Cloudinary upload failed:', uploadError.message);
+
+        // Fallback: return error (Cloudinary should always work)
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to upload visualization to cloud storage',
+          details: uploadError.message
+        });
       }
-
-      // Generate unique filename with timestamp
-      const timestamp = Date.now();
-      const filename = `visualization-${timestamp}.png`;
-      const filepath = path.join(visualizationsDir, filename);
-
-      // Save the file
-      fs.writeFileSync(filepath, buffer);
-
-      // Construct public URL
-      const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
-      const imageUrl = `${baseUrl}/visualizations/${filename}`;
-
-      console.log('Saved visualization to:', filepath);
-      console.log('Public URL:', imageUrl);
-
-      res.json({
-        success: true,
-        message: `Generated visualization for ${data.length} items`,
-        imageUrl: imageUrl,
-        image: imageUrl,
-        filename: filename,
-        format: 'png',
-        items: data.length,
-        expiresIn: '48 hours'
-      });
     } else {
       // Return raw PNG binary (for direct download)
       res.set('Content-Type', 'image/png');
